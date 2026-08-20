@@ -8,7 +8,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 {
     juce::ignoreUnused (processorRef);
     
-    setSize (400, 300);
+    addAndMakeVisible(helixxUI);
+    setSize (300, 600);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
