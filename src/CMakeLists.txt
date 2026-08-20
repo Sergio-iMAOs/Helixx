@@ -19,6 +19,12 @@ juce_add_plugin(${PROJECT_NAME}
 
 target_sources(${PROJECT_NAME}
     PRIVATE
+        ui/HelixxComponent.cpp
+        dsp/PitchDetector.cpp
+        dsp/Oscillator.cpp
+        dsp/FractionalDelay.cpp
+        dsp/DelayFM.cpp
+        Helixx.cpp
         PluginEditor.cpp
         PluginProcessor.cpp)
 
