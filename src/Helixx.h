@@ -7,17 +7,25 @@
 namespace helixx
 {
 
+namespace ID
+{
+    const juce::String FMCoarseFreqID   = "fmFreq";
+    const juce::String FMDepthID        = "FMDepthID";
+} // namespace ID
+
 class Helixx
 {
 public:
-    Helixx(juce::AudioProcessorValueTreeState& parameters);
+    explicit Helixx(juce::AudioProcessor& processor);
     ~Helixx();
 
     void prepare(double sampleRate, int samplesPerBlock, unsigned int numChannels);
     void process(juce::AudioBuffer<float>& buffer);
 
+    juce::AudioProcessorValueTreeState& getAPVTS();
+
 private:
-    juce::AudioProcessorValueTreeState& parameters;
+    juce::AudioProcessorValueTreeState parameters;
     DelayFM delayFM;
     
     void updateParameters();

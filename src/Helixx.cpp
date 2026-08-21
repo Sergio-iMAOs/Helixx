@@ -4,30 +4,34 @@
 namespace helixx
 {
 
-namespace
-{
-    #define FMCoarseFreqID    "fmFreq"
-    #define FMDepthID   "FMDepthID"
-}
+namespace {
+    constexpr int VERSION_HINT = 1;
+} // anonymous-namespace
 
-Helixx::Helixx(juce::AudioProcessorValueTreeState& parameters)
+Helixx::Helixx(juce::AudioProcessor& processor)
     :
-    parameters(parameters)
-{
-    parameters.createAndAddParameter (
-        std::make_unique<juce::AudioParameterFloat> (FMCoarseFreqID, // parameterID
-            "FM Coarse Freq", // parameter name
-            0.25f, // minimum value
-            4.0f, // maximum value
-            1.0f) // default value
-    );
-    parameters.createAndAddParameter (
-        std::make_unique<juce::AudioParameterFloat> (FMDepthID, // parameterID
-            "FM Depth", // parameter name
-            0.f, // minimum value
-            1.0f, // maximum value
-            0.0f) // default value
-    );
+    parameters (
+        processor,
+        nullptr,
+        juce::Identifier ("APVTSHelixx"),
+        {
+            std::make_unique<juce::AudioParameterFloat> (
+                juce::ParameterID(ID::FMCoarseFreqID, VERSION_HINT), // parameterID
+                "FM Coarse Freq", // parameter name
+                0.25f, // minimum value
+                4.0f, // maximum value
+                1.0f // default value
+            ),
+            std::make_unique<juce::AudioParameterFloat> (
+                juce::ParameterID(ID::FMDepthID, VERSION_HINT), // parameterID
+                "FM Depth", // parameter name
+                0.f, // minimum value
+                1.0f, // maximum value
+                0.0f // default value
+            )
+        }
+    )
+{       
 }
 
 Helixx::~Helixx()
@@ -42,20 +46,19 @@ void Helixx::prepare(double sampleRate, int samplesPerBlock, unsigned int numCha
 void Helixx::process(juce::AudioBuffer<float> &buffer)
 {
     updateParameters();
-    const auto numChannels = buffer.getNumChannels();
-    const auto numFrames = buffer.getNumSamples();
+    const auto numFrames = static_cast<unsigned int>(buffer.getNumSamples());
+    delayFM.process(buffer.getArrayOfWritePointers(), numFrames);
+}
 
-    for (auto chIdx = 0; chIdx < numChannels; ++chIdx)
-    {
-        float* const* channels = buffer.getArrayOfWritePointers();
-        delayFM.process(channels, numFrames);
-    }
+juce::AudioProcessorValueTreeState &Helixx::getAPVTS()
+{
+    return parameters;
 }
 
 void Helixx::updateParameters()
 {
-    delayFM .setCoarseFreq  (*parameters.getRawParameterValue(FMCoarseFreqID));
-    delayFM .setDepth       (*parameters.getRawParameterValue(FMDepthID));
+    delayFM .setCoarseFreq  (*parameters.getRawParameterValue(ID::FMCoarseFreqID));
+    delayFM .setDepth       (*parameters.getRawParameterValue(ID::FMDepthID));
 }
 
 } // namespace helixx
