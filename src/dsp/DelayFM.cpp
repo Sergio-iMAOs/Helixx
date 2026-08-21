@@ -36,6 +36,7 @@ void DelayFM::prepare(double sampleRate, int samplesPerBlock, unsigned int numCh
 
     blockSizeInv = 1.f / samplesPerBlock;
     this->sampleRate = static_cast<float>(sampleRate);
+    samplePeriod = 1.f / sampleRate;
 }
 
 void DelayFM::process(float* const* channelPtrs, unsigned int numSamples)
@@ -43,7 +44,8 @@ void DelayFM::process(float* const* channelPtrs, unsigned int numSamples)
     // Get pitches
     for (auto chIdx = 0; chIdx < pitches.size(); ++chIdx)
     {
-        pitches[chIdx] = pitchDetectors[chIdx].getPitch(channelPtrs[chIdx]);
+        auto pitch = pitchDetectors[chIdx].getPitch(channelPtrs[chIdx]);
+        pitches[chIdx] = pitch == 0 ? previousPitches[chIdx] : pitch;
     }
 
     for (auto frameIdx = 0; frameIdx < numSamples; ++frameIdx)
@@ -97,15 +99,34 @@ void DelayFM::setDepth(float newDepth)
     depth = newDepth;
 }
 
+void DelayFM::setModRangeMs(float ms)
+{
+    assert(ms >= 0.f);
+    assert(ms * 0.001f < MAX_LENGTH * samplePeriod);
+    modRangeMs = ms;
+}
+
+void DelayFM::setModRangeRel(float value)
+{
+    assert(value >= 0);
+    assert(value < MAX_LENGTH);
+    modRangeRel = value * samplePeriod;
+}
+
+void DelayFM::setRelativeToPitch(bool isRelative)
+{
+    isRelativeToPitch = isRelative;
+}
+
 float DelayFM::getModRangeSamples(float f0)
 {
     if (isRelativeToPitch)
     {
-        return modRangeMs * 0.001f * sampleRate;
+        return f0 * modRangeRel;
     }
     else
     {
-        
+        return modRangeMs * 0.001f * sampleRate;
     } 
 }
 

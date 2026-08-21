@@ -11,10 +11,10 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
      : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
                       #if ! JucePlugin_IsSynth
-                       .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(NUM_CHANNELS), true)
+                       .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
                        //.withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
                       #endif
-                       .withOutput ("Output", juce::AudioChannelSet::discreteChannels(NUM_CHANNELS), true)
+                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                        //.withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
@@ -105,7 +105,17 @@ void AudioPluginAudioProcessor::releaseResources()
 
 bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
-    return true;
+    const auto numIn  = layouts.getMainInputChannelSet().size();
+    const auto numOut = layouts.getMainOutputChannelSet().size();
+
+    // Reject unconfigured buses.
+    if (layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled())
+        return false;
+
+    // Require matching in/out channel counts, allow anything from mono up
+    // to whatever ceiling makes sense for your DSP (e.g. 32).
+    constexpr int maxChannels = 32;
+    return numIn == numOut && numIn >= 1 && numIn <= maxChannels;
 }
 
 void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,

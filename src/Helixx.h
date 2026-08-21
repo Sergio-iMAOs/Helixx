@@ -10,7 +10,10 @@ namespace helixx
 namespace ID
 {
     const juce::String FMCoarseFreqID   = "fmFreq";
-    const juce::String FMDepthID        = "FMDepthID";
+    const juce::String FMDepthID        = "fmDepthID";
+    const juce::String FMRangeMsID      = "fmRangeMsID";
+    const juce::String FMRangeRelID     = "fmRangeRelID";
+    const juce::String FMIsRelativeID   = "fmIsRelID";
 } // namespace ID
 
 class Helixx

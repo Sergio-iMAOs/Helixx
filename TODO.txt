@@ -1,5 +1,3 @@
-PluginProcessor Set 6 channels.
-    Check buses layout
-    Check isBusesLayoutSupported
+Oversampling
 
-DelayFM Make changeable mod range
+DelayFM Make relative range

@@ -19,8 +19,11 @@ public:
     void prepare(double sampleRate, int samplesPerBlock, unsigned int numChannels);
     void process(float* const* channelPtrs, unsigned int numSamples);
 
-    void setCoarseFreq(float newFreq);
-    void setDepth(float newDepth);
+    void setCoarseFreq      (float newFreq);
+    void setDepth           (float newDepth);
+    void setModRangeMs      (float ms);
+    void setModRangeRel     (float st);
+    void setRelativeToPitch (bool isRelative);
 
 private:
     float coarseFreq;
@@ -32,12 +35,13 @@ private:
     std::vector<float> previousPitches;
     std::vector<Oscillator> modulators;
     std::vector<PitchDetector> pitchDetectors;
-    bool isRelativeToPitch = false;
-    float modRangeMs = 20.f;
-    float modRangeSemitones = 24.f;
+    bool isRelativeToPitch;
+    float modRangeMs;
+    float modRangeRel;
 
     float sampleRate;
     float blockSizeInv;
+    float samplePeriod;
 
     float getModRangeSamples(float f0);
 

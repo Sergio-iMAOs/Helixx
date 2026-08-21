@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Plugin in REAPER",
+      "type": "lldb",
+      "request": "launch",
+      "program": "/Applications/REAPER.app/Contents/MacOS/REAPER",
+      "args": ["test_reaper.RPP"],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": ["cpp"]
+    }
+  ]
+}
