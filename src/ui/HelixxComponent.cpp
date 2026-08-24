@@ -11,13 +11,13 @@ HelixxComponent::HelixxComponent(Helixx& helixxDSP)
 
     coarseFreqAttachment.reset(new SliderAttachment(apvts, ID::FMCoarseFreqID   , coarseFreqSlider));
     depthAttachment     .reset(new SliderAttachment(apvts, ID::FMDepthID        , depthSlider));
-    rangeAttachment     .reset(new SliderAttachment(apvts, ID::FMRangeMsID      , rangeSlider));
+    buttonStateChanged(&relativeButton);
     relativeAttachment  .reset(new ButtonAttachment(apvts, ID::FMIsRelativeID   , relativeButton));
 
     coarseFreqLabel .setText("COARSE FREQ"  , juce::dontSendNotification);
     depthLabel      .setText("MOD DEPTH"    , juce::dontSendNotification);
     rangeLabel      .setText("MOD RANGE"    , juce::dontSendNotification);
-    relativeLabel      .setText("RELATIVE"     , juce::dontSendNotification);
+    relativeLabel   .setText("RELATIVE"     , juce::dontSendNotification);
     coarseFreqLabel .setJustificationType(juce::Justification::centred);
     depthLabel      .setJustificationType(juce::Justification::centred);
     rangeLabel      .setJustificationType(juce::Justification::centred);

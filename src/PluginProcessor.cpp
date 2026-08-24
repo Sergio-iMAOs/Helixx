@@ -95,6 +95,7 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     helixx.prepare(sampleRate, samplesPerBlock, static_cast<unsigned int>(getTotalNumInputChannels()));
+    setLatencySamples(helixx.getLatencySamples()); // report oversampling filter latency to host
 }
 
 void AudioPluginAudioProcessor::releaseResources()

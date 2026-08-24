@@ -11,15 +11,15 @@ DelayFM::~DelayFM()
 {
 }
 
-void DelayFM::prepare(double sampleRate, int samplesPerBlock, unsigned int numChannels)
+void DelayFM::prepare(double sampleRate, unsigned int samplesPerBlock, unsigned int numChannels)
 {
     assert(sampleRate > 0.0);
     assert(samplesPerBlock > 0);
     assert(numChannels > 0);
 
-    delayLines.clear();
-    modulators.clear();
-    pitchDetectors.clear();
+    delayLines      .clear();
+    modulators      .clear();
+    pitchDetectors  .clear();
 
     for (auto chIdx = 0; chIdx < numChannels; ++chIdx)
     {
@@ -31,8 +31,9 @@ void DelayFM::prepare(double sampleRate, int samplesPerBlock, unsigned int numCh
         pitchDetectors.push_back(PitchDetector());
         pitchDetectors.back().prepare(sampleRate, samplesPerBlock);
     }
-    pitches          .resize(numChannels, 0.f);
-    previousPitches  .resize(numChannels, 0.f);
+    pitches         .resize(numChannels, 55.f);
+    previousPitches .resize(numChannels, 55.f);
+    modRangeSamples .resize(numChannels, 0.f);
 
     blockSizeInv = 1.f / samplesPerBlock;
     this->sampleRate = static_cast<float>(sampleRate);
@@ -42,20 +43,22 @@ void DelayFM::prepare(double sampleRate, int samplesPerBlock, unsigned int numCh
 void DelayFM::process(float* const* channelPtrs, unsigned int numSamples)
 {
     // Get pitches
-    for (auto chIdx = 0; chIdx < pitches.size(); ++chIdx)
+    for (size_t chIdx = 0; chIdx < pitches.size(); ++chIdx)
     {
         auto pitch = pitchDetectors[chIdx].getPitch(channelPtrs[chIdx]);
-        pitches[chIdx] = pitch == 0 ? previousPitches[chIdx] : pitch;
+        pitch = pitch == 0.f ? previousPitches[chIdx] : pitch;
+        pitches[chIdx] = pitch;
+        modRangeSamples[chIdx] = getModRangeSamples(pitch);
     }
 
-    for (auto frameIdx = 0; frameIdx < numSamples; ++frameIdx)
+    for (size_t frameIdx = 0; frameIdx < numSamples; ++frameIdx)
     {
         // Ramp parameters
         auto workCoarseFreq = coarseFreqPrev * (1.f - frameIdx * blockSizeInv) + coarseFreq * (frameIdx * blockSizeInv);
         auto workDepth = depthPrev * (1.f - frameIdx * blockSizeInv) + depth * (frameIdx * blockSizeInv);
 
         // Set delay times
-        for (auto chIdx = 0; chIdx < delayLines.size(); ++chIdx)
+        for (size_t chIdx = 0; chIdx < delayLines.size(); ++chIdx)
         {   
             // Apply pitch ramp
             auto pitch = previousPitches[chIdx] * (1.f - frameIdx * blockSizeInv) + pitches[chIdx] * (frameIdx * blockSizeInv);
@@ -64,8 +67,7 @@ void DelayFM::process(float* const* channelPtrs, unsigned int numSamples)
             modulators[chIdx].setFrequency(pitch * workCoarseFreq);
 
             // Calulate delay time
-            auto modRangeSamples = getModRangeSamples(pitch);
-            auto baseDelay = modRangeSamples * 0.5f * workDepth; // Half mod range to keep original freq centered
+            auto baseDelay = modRangeSamples[chIdx] * 0.5f * workDepth; // Half mod range to keep original freq centered
             auto delayTime = baseDelay + modulators[chIdx].processSample() * baseDelay;
             
             // Process delay line
@@ -79,7 +81,7 @@ void DelayFM::process(float* const* channelPtrs, unsigned int numSamples)
     }
 
     // Update previous pitches
-    for (auto chIdx = 0; chIdx < pitches.size(); ++chIdx)
+    for (size_t chIdx = 0; chIdx < pitches.size(); ++chIdx)
     {
         previousPitches[chIdx] = pitches[chIdx];
     }
@@ -106,11 +108,11 @@ void DelayFM::setModRangeMs(float ms)
     modRangeMs = ms;
 }
 
-void DelayFM::setModRangeRel(float value)
+void DelayFM::setModRangeRatio(float value)
 {
-    assert(value >= 0);
-    assert(value < MAX_LENGTH);
-    modRangeRel = value * samplePeriod;
+    assert(value >= 1.0f && value <= 4.0f); // matches the parameter's NormalisableRange [0, 24] st
+    modRangeRatio = value;
+    modRangeFactor = 1.0f - 1.0f / modRangeRatio; // division done once, here, not per-sample
 }
 
 void DelayFM::setRelativeToPitch(bool isRelative)
@@ -122,7 +124,7 @@ float DelayFM::getModRangeSamples(float f0)
 {
     if (isRelativeToPitch)
     {
-        return f0 * modRangeRel;
+        return (sampleRate / f0) * modRangeFactor;
     }
     else
     {

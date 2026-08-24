@@ -1,3 +1,9 @@
 Oversampling
 
-DelayFM Make relative range
+Change all unsigned int for size_t ??
+
+Check f0 estimation
+
+Check if pitch is drifting
+
+FIFO parameter update
