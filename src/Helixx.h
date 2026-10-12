@@ -11,6 +11,8 @@ namespace helixx
 /** @brief Identifiers of the plugin parameters, as stored in the APVTS and in saved sessions. */
 namespace ID
 {
+    /** @brief Algorithm applied to every channel, see helixx::Algorithm. */
+    const juce::String AlgorithmID      = "algorithmID";
     /** @brief Modulator frequency as a multiple of the detected pitch. */
     const juce::String FMCoarseFreqID   = "fmFreq";
     /** @brief Modulation depth, 0..1. */
@@ -69,6 +71,7 @@ private:
     juce::AudioProcessorValueTreeState parameters;
 
     // Raw parameter values, cached to avoid a lookup by name on every block.
+    std::atomic<float>* algorithmParam  = nullptr;
     std::atomic<float>* coarseFreqParam = nullptr;
     std::atomic<float>* depthParam      = nullptr;
     std::atomic<float>* rangeMsParam    = nullptr;

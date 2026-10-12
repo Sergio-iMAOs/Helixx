@@ -6,6 +6,7 @@ namespace helixx
 
 namespace {
     constexpr int VERSION_HINT = 1;
+    constexpr int VERSION_HINT_ALGORITHM = 2; // parameters added along with the algorithm choice
 } // anonymous-namespace
 
 Helixx::Helixx(juce::AudioProcessor& processor)
@@ -15,6 +16,12 @@ Helixx::Helixx(juce::AudioProcessor& processor)
         nullptr,
         juce::Identifier ("APVTSHelixx"),
         {
+            std::make_unique<juce::AudioParameterChoice> (
+                juce::ParameterID(ID::AlgorithmID, VERSION_HINT_ALGORITHM), // parameterID
+                "Algorithm", // parameter name
+                juce::StringArray { "Adaptive FM", "Allpass", "Feedback AM" }, // same order as helixx::Algorithm
+                0   // default: Adaptive FM
+            ),
             std::make_unique<juce::AudioParameterFloat> (
                 juce::ParameterID(ID::FMCoarseFreqID, VERSION_HINT), // parameterID
                 "FM Coarse Freq", // parameter name
@@ -86,6 +93,7 @@ Helixx::Helixx(juce::AudioProcessor& processor)
         }
     )
 {
+    algorithmParam  = parameters.getRawParameterValue(ID::AlgorithmID);
     coarseFreqParam = parameters.getRawParameterValue(ID::FMCoarseFreqID);
     depthParam      = parameters.getRawParameterValue(ID::FMDepthID);
     rangeMsParam    = parameters.getRawParameterValue(ID::FMRangeMsID);
@@ -175,6 +183,7 @@ int Helixx::getLatencySamples() const
 
 void Helixx::updateParameters()
 {
+    delayFM .setAlgorithm       (static_cast<Algorithm>(juce::roundToInt(algorithmParam->load())));
     delayFM .setCoarseFreq      (coarseFreqParam->load());
     delayFM .setDepth           (depthParam->load());
     delayFM .setModRangeMs      (rangeMsParam->load());

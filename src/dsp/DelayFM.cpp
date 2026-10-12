@@ -41,8 +41,12 @@ void DelayFM::prepare(double newSampleRate, unsigned int numChannels)
     }
     pitches         .assign(numChannels, initialPitchHz);
     modRangeSamples .assign(numChannels, 0.f);
+    filterStates    .assign(numChannels, FilterState());
 
     maxDelaySamples = static_cast<float>(delayLength);
+    dcBlockerCoeff  = 1.f - 6.283185307179586f * dcBlockerCutoffHz / sampleRate;
+
+    algorithm = pendingAlgorithm;
 
     // Start from the settled parameter values rather than ramping to them.
     coarseFreq = coarseFreqTarget;
@@ -61,11 +65,27 @@ void DelayFM::process(float* const* channelPtrs, unsigned int numChannels, unsig
     const auto coarseFreqIncr = (coarseFreqTarget - coarseFreq) * rampStep;
     const auto depthIncr      = (depthTarget - depth) * rampStep;
 
+    if (algorithm != pendingAlgorithm)
+    {
+        // Don't let the new algorithm start from audio left by an earlier one
+        clearAudioState();
+        algorithm = pendingAlgorithm;
+    }
+
+    // Peak allpass coefficient, ramped along with the depth
+    const auto allpassCoeff     = getAllpassCoeff(depth);
+    const auto allpassCoeffIncr = (getAllpassCoeff(depthTarget) - allpassCoeff) * rampStep;
+
+    // Level compensation of the feedback AM loop, ramped along with the depth
+    const auto feedbackGain     = getFeedbackAMGain(depth * maxFeedback);
+    const auto feedbackGainIncr = (getFeedbackAMGain(depthTarget * maxFeedback) - feedbackGain) * rampStep;
+
     for (size_t chIdx = 0; chIdx < numActiveChannels; ++chIdx)
     {
         auto* samples    = channelPtrs[chIdx];
         auto& delayLine  = delayLines[chIdx];
         auto& modulator  = modulators[chIdx];
+        auto& filter     = filterStates[chIdx];
 
         // Get pitch from the dry input; hold the last one while unvoiced
         const auto detectedPitch = pitchDetectors[chIdx].process(samples, numSamples);
@@ -79,6 +99,8 @@ void DelayFM::process(float* const* channelPtrs, unsigned int numChannels, unsig
         auto workRange      = modRangeSamples[chIdx];
         auto workCoarseFreq = coarseFreq;
         auto workDepth      = depth;
+        auto workAllpassCoeff = allpassCoeff;
+        auto workFeedbackGain = feedbackGain;
 
         for (unsigned int frameIdx = 0; frameIdx < numSamples; ++frameIdx)
         {
@@ -87,17 +109,58 @@ void DelayFM::process(float* const* channelPtrs, unsigned int numChannels, unsig
             workRange      += rangeIncr;
             workCoarseFreq += coarseFreqIncr;
             workDepth      += depthIncr;
+            workAllpassCoeff += allpassCoeffIncr;
+            workFeedbackGain += feedbackGainIncr;
 
             // Set modulator frequency
             modulator.setFrequency(workPitch * workCoarseFreq);
+            const auto modSample = modulator.processSample();
 
-            // Calulate delay time
-            const auto baseDelay = workRange * 0.5f * workDepth; // Half mod range to keep original freq centered
-            const auto delayTime = baseDelay + modulator.processSample() * baseDelay;
+            const auto input = samples[frameIdx];
+            auto output = input;
 
-            // Process delay line
-            delayLine.setTimeInSamples(std::clamp(delayTime, 0.f, maxDelaySamples));
-            samples[frameIdx] = delayLine.processSample(samples[frameIdx]);
+            switch (algorithm)
+            {
+                case Algorithm::AdaptiveFM:
+                {
+                    // Calulate delay time
+                    const auto baseDelay = workRange * 0.5f * workDepth; // Half mod range to keep original freq centered
+                    const auto delayTime = baseDelay + modSample * baseDelay;
+
+                    // Process delay line
+                    delayLine.setTimeInSamples(std::clamp(delayTime, 0.f, maxDelaySamples));
+                    output = delayLine.processSample(input);
+                    break;
+                }
+                case Algorithm::Allpass:
+                {
+                    // y(n) = -m(n) x(n) + w(n-1),  w(n) = x(n) + m(n) y(n)
+                    const auto coeff = modSample * workAllpassCoeff;
+                    output = filter.allpass - coeff * input;
+                    filter.allpass = input + coeff * output;
+                    break;
+                }
+                case Algorithm::FeedbackAM:
+                {
+                    // y(n) = x(n) + beta m(n) y(n-1)
+                    const auto beta = workDepth * maxFeedback;
+                    filter.feedback = input + beta * modSample * filter.feedback;
+                    output = filter.feedback * workFeedbackGain;
+                    break;
+                }
+            }
+
+            if (algorithm != Algorithm::AdaptiveFM)
+            {
+                // Modulating a filter coefficient at a multiple of the pitch
+                // rectifies part of the signal: remove the resulting DC
+                const auto blocked = output - filter.dcIn + dcBlockerCoeff * filter.dcOut;
+                filter.dcIn  = output;
+                filter.dcOut = blocked;
+                output = blocked;
+            }
+
+            samples[frameIdx] = output;
         }
 
         // Land exactly on the targets so rounding errors don't accumulate
@@ -107,6 +170,11 @@ void DelayFM::process(float* const* channelPtrs, unsigned int numChannels, unsig
 
     coarseFreq = coarseFreqTarget;
     depth      = depthTarget;
+}
+
+void DelayFM::setAlgorithm(Algorithm newAlgorithm)
+{
+    pendingAlgorithm = newAlgorithm;
 }
 
 void DelayFM::setCoarseFreq(float newFreq)
@@ -137,6 +205,30 @@ void DelayFM::setModRangeRatio(float ratio)
 void DelayFM::setRelativeToPitch(bool isRelative)
 {
     isRelativeToPitch = isRelative;
+}
+
+void DelayFM::clearAudioState()
+{
+    for (auto& delayLine : delayLines)
+        delayLine.clear();
+
+    std::fill(filterStates.begin(), filterStates.end(), FilterState());
+}
+
+float DelayFM::getAllpassCoeff(float depth)
+{
+    // The delay of the filter is (1 - m) / (1 + m): nearly all of its range
+    // is packed next to |m| = 1. Approaching 1 geometrically spreads it
+    // evenly over the depth control.
+    return 1.f - std::pow(1.f - maxAllpassCoeff, depth);
+}
+
+float DelayFM::getFeedbackAMGain(float beta)
+{
+    // For a modulator much slower than the sample rate the loop settles to
+    // x / (1 - beta m); averaging the squared gain over one cycle of m gives
+    // (1 - beta^2)^(-3/2).
+    return std::pow(1.f - beta * beta, 0.75f);
 }
 
 float DelayFM::getModRangeSamples(float f0) const

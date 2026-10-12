@@ -9,6 +9,14 @@ HelixxComponent::HelixxComponent(Helixx& helixxDSP)
 {
     auto& apvts = helixx.getAPVTS();
 
+    // The attachment selects by index: the items must be there before it is created.
+    if (auto* algorithmParam = dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(ID::AlgorithmID)))
+        algorithmBox.addItemList(algorithmParam->choices, 1);
+
+    algorithmBox.onChange = [this] { updateRangeEnablement(); };
+    algorithmAttachment .reset(new ComboBoxAttachment(apvts, ID::AlgorithmID    , algorithmBox));
+    updateRangeEnablement();
+
     coarseFreqAttachment.reset(new SliderAttachment(apvts, ID::FMCoarseFreqID   , coarseFreqSlider));
     depthAttachment     .reset(new SliderAttachment(apvts, ID::FMDepthID        , depthSlider));
 
@@ -26,6 +34,8 @@ HelixxComponent::HelixxComponent(Helixx& helixxDSP)
     depthLabel      .setJustificationType(juce::Justification::centred);
     rangeLabel      .setJustificationType(juce::Justification::centred);
     relativeLabel   .setJustificationType(juce::Justification::centred);
+
+    addAndMakeVisible(algorithmBox);
 
     addAndMakeVisible(coarseFreqLabel);
     addAndMakeVisible(depthLabel);
@@ -52,6 +62,10 @@ void HelixxComponent::resized()
     auto bounds = getLocalBounds().reduced(margin);
 
     constexpr auto labelHeight = 20;
+    constexpr auto algorithmHeight = 24;
+
+    algorithmBox.setBounds(bounds.removeFromTop(algorithmHeight));
+    bounds.removeFromTop(margin);
     const auto sliderWidth = bounds.getWidth() / 3;
 
     auto freqBounds     = bounds.removeFromLeft(sliderWidth);
@@ -96,6 +110,16 @@ void HelixxComponent::updateRangeAttachment()
     rangeAttachment.reset();
     rangeAttachment.reset(new SliderAttachment(apvts, isRelative ? ID::FMRangeRelID : ID::FMRangeMsID, rangeSlider));
     rangeIsRelative = isRelative;
+}
+
+void HelixxComponent::updateRangeEnablement()
+{
+    const auto usesRange = algorithmBox.getSelectedItemIndex() == static_cast<int>(Algorithm::AdaptiveFM);
+
+    rangeSlider     .setEnabled(usesRange);
+    relativeButton  .setEnabled(usesRange);
+    rangeLabel      .setEnabled(usesRange);
+    relativeLabel   .setEnabled(usesRange);
 }
 
 } // namespace helixx
