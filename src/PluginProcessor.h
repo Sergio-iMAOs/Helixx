@@ -4,6 +4,14 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 //==============================================================================
+/**
+ * @brief JUCE plugin entry point: hosts the Helixx effect.
+ *
+ * Handles the host-facing side (bus layouts, latency reporting, state
+ * persistence) and delegates all audio processing to helixx::Helixx.
+ * Accepts any layout with the same number of input and output channels,
+ * from mono up to 32, each channel being processed as an independent voice.
+ */
 class AudioPluginAudioProcessor final : public juce::AudioProcessor
 {
 public:
@@ -43,6 +51,7 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    /** @brief Returns the effect, so the editor can attach to its parameters. */
     helixx::Helixx& getHelixx();
 
 private:

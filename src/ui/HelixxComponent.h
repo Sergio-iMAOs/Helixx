@@ -7,9 +7,20 @@
 namespace helixx
 {
 
+/**
+ * @brief Control panel of the effect: coarse frequency, depth and range
+ *        sliders plus the relative-range toggle.
+ *
+ * The single range slider edits either the millisecond or the relative range
+ * parameter, following the state of the toggle.
+ */
 class HelixxComponent: public juce::Component, private juce::Button::Listener
 {
 public:
+    /**
+     * @brief Builds the controls and attaches them to the effect's parameters.
+     * @param helixxDSP The effect to control; must outlive this component.
+     */
     explicit HelixxComponent(Helixx& helixxDSP);
     ~HelixxComponent() override;
 
@@ -54,6 +65,14 @@ private:
     std::unique_ptr<SliderAttachment> depthAttachment;
     std::unique_ptr<SliderAttachment> rangeAttachment;
     std::unique_ptr<ButtonAttachment> relativeAttachment;
+
+    bool rangeIsRelative = false; // which parameter rangeAttachment is bound to
+
+    /**
+     * @brief Binds the range slider to the parameter matching the toggle:
+     *        relative range when it is on, milliseconds when it is off.
+     */
+    void updateRangeAttachment();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HelixxComponent)
 };

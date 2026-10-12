@@ -1,5 +1,6 @@
 #include "PitchDetector.h"
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <limits>
 
@@ -9,33 +10,102 @@ namespace helixx
 PitchDetector::PitchDetector() = default;
 PitchDetector::~PitchDetector() = default;
 
-void PitchDetector::prepare(double newSampleRate, unsigned int samplesPerBlock)
+void PitchDetector::prepare(double sampleRate)
 {
-    sampleRate = newSampleRate;
-    blockSize = samplesPerBlock;
-    halfBufferSize = blockSize / 2;
+    assert(sampleRate > 0.0);
 
-    yinBuffer.assign(halfBufferSize, 0.0f);
+    decimationFactor = std::max(1u, static_cast<unsigned int>(std::lround(sampleRate / targetAnalysisRateHz)));
+    analysisRate = static_cast<float>(sampleRate / decimationFactor);
 
     // Convert the frequency range of interest into a tau (lag) search range.
     // Higher frequency -> smaller tau, lower frequency -> larger tau.
-    const float maxTauF = static_cast<float>(sampleRate) / minFrequencyHz;
-    const float minTauF = static_cast<float>(sampleRate) / maxFrequencyHz;
+    minTau = std::max(2u, static_cast<unsigned int>(std::floor(analysisRate / maxFrequencyHz)));
+    maxTau = std::max(minTau + 1, static_cast<unsigned int>(std::ceil(analysisRate / minFrequencyHz)));
 
-    minTau = std::max(2u, static_cast<unsigned int>(minTauF));
-    maxTau = std::min(halfBufferSize > 0 ? halfBufferSize - 1 : 0,
-                       static_cast<unsigned int>(maxTauF));
+    // Integrate over one period of the lowest pitch. The window must also hold
+    // the lagged samples up to maxTau + 1 (the +1 is the interpolation neighbour).
+    integrationLength = maxTau;
+    window.assign(integrationLength + maxTau + 1, 0.0f);
+    yinBuffer.assign(maxTau + 2, 0.0f);
+
+    hopSize = std::clamp(static_cast<unsigned int>(analysisRate * hopSeconds),
+                         1u, static_cast<unsigned int>(window.size()));
+
+    reset();
 }
 
-void PitchDetector::computeDifference(float const* buffer)
+void PitchDetector::reset()
+{
+    std::fill(window.begin(), window.end(), 0.0f);
+    fillCount = 0;
+    decimationCount = 0;
+    decimationSum = 0.0f;
+    pitch = 0.0f;
+}
+
+float PitchDetector::process(float const* samples, unsigned int numSamples)
+{
+    if (window.empty())
+        return 0.0f; // not prepared
+
+    const auto windowSize = static_cast<unsigned int>(window.size());
+    const float decimationGain = 1.0f / static_cast<float>(decimationFactor);
+
+    for (unsigned int i = 0; i < numSamples; ++i)
+    {
+        decimationSum += samples[i];
+        if (++decimationCount < decimationFactor)
+            continue;
+
+        window[fillCount++] = decimationSum * decimationGain;
+        decimationSum = 0.0f;
+        decimationCount = 0;
+
+        if (fillCount == windowSize)
+        {
+            pitch = analyse();
+
+            // Slide the window forward by one hop.
+            std::copy(window.begin() + hopSize, window.end(), window.begin());
+            fillCount -= hopSize;
+        }
+    }
+
+    return pitch;
+}
+
+float PitchDetector::getPitch() const
+{
+    return pitch;
+}
+
+float PitchDetector::analyse()
+{
+    computeDifference();
+    computeCumulativeMeanNormalizedDifference();
+
+    const int tau = findAbsoluteThresholdTau();
+    if (tau < 0)
+        return 0.0f; // no pitch detected
+
+    const float frequency = analysisRate / parabolicInterpolation(tau);
+    if (! (frequency >= minFrequencyHz && frequency <= maxFrequencyHz))
+        return 0.0f; // out of range (or NaN from a non-finite input)
+
+    return frequency;
+}
+
+void PitchDetector::computeDifference()
 {
     // d(tau) = sum_{j=0}^{W-1} (x[j] - x[j+tau])^2
-    for (unsigned int tau = 0; tau < halfBufferSize; ++tau)
+    const float* x = window.data();
+
+    for (unsigned int tau = 0; tau <= maxTau + 1; ++tau)
     {
         float sum = 0.0f;
-        for (unsigned int j = 0; j < halfBufferSize; ++j)
+        for (unsigned int j = 0; j < integrationLength; ++j)
         {
-            const float delta = buffer[j] - buffer[j + tau];
+            const float delta = x[j] - x[j + tau];
             sum += delta * delta;
         }
         yinBuffer[tau] = sum;
@@ -49,11 +119,11 @@ void PitchDetector::computeCumulativeMeanNormalizedDifference()
     yinBuffer[0] = 1.0f;
 
     float runningSum = 0.0f;
-    for (unsigned int tau = 1; tau < halfBufferSize; ++tau)
+    for (unsigned int tau = 1; tau <= maxTau + 1; ++tau)
     {
         runningSum += yinBuffer[tau];
 
-        if (runningSum <= 0.0f)
+        if (runningSum <= std::numeric_limits<float>::min())
             yinBuffer[tau] = 1.0f; // avoid divide-by-zero on silence
         else
             yinBuffer[tau] *= static_cast<float>(tau) / runningSum;
@@ -62,16 +132,14 @@ void PitchDetector::computeCumulativeMeanNormalizedDifference()
 
 int PitchDetector::findAbsoluteThresholdTau() const
 {
-    const unsigned int searchEnd = std::min(maxTau, halfBufferSize - 1);
-
-    for (unsigned int tau = minTau; tau <= searchEnd; ++tau)
+    for (unsigned int tau = minTau; tau <= maxTau; ++tau)
     {
         if (yinBuffer[tau] < threshold)
         {
             // Walk forward while the CMNDF keeps decreasing, to land on the
             // local minimum rather than the first sample under threshold.
             unsigned int localMinTau = tau;
-            while (localMinTau + 1 <= searchEnd &&
+            while (localMinTau + 1 <= maxTau &&
                    yinBuffer[localMinTau + 1] < yinBuffer[localMinTau])
             {
                 ++localMinTau;
@@ -85,13 +153,10 @@ int PitchDetector::findAbsoluteThresholdTau() const
 
 float PitchDetector::parabolicInterpolation(int tauEstimate) const
 {
-    const int tau = tauEstimate;
+    const auto tau = static_cast<unsigned int>(tauEstimate);
 
-    // Guard the neighbors used for interpolation; fall back to the raw
-    // estimate at the buffer edges where a neighbor is unavailable.
-    if (tau <= 0 || static_cast<unsigned int>(tau) >= halfBufferSize - 1)
-        return static_cast<float>(tau);
-
+    // tau is in [minTau, maxTau] with minTau >= 2 and yinBuffer holding
+    // maxTau + 2 values, so both neighbours are always available.
     const float s0 = yinBuffer[tau - 1];
     const float s1 = yinBuffer[tau];
     const float s2 = yinBuffer[tau + 1];
@@ -100,27 +165,10 @@ float PitchDetector::parabolicInterpolation(int tauEstimate) const
     if (std::abs(denom) < std::numeric_limits<float>::epsilon())
         return static_cast<float>(tau);
 
-    const float delta = (s2 - s0) / denom;
+    // The vertex lies within half a sample of a true local minimum; clamp in
+    // case tau sits on the edge of the search range and is not one.
+    const float delta = std::clamp((s2 - s0) / denom, -1.0f, 1.0f);
     return static_cast<float>(tau) + delta;
-}
-
-float PitchDetector::getPitch(float const* buffer)
-{
-    if (halfBufferSize == 0)
-        return 0.0f;
-
-    computeDifference(buffer);
-    computeCumulativeMeanNormalizedDifference();
-
-    const int tau = findAbsoluteThresholdTau();
-    if (tau < 0)
-        return 0.0f; // no pitch detected
-
-    const float refinedTau = parabolicInterpolation(tau);
-    if (refinedTau <= 0.0f)
-        return 0.0f;
-
-    return static_cast<float>(sampleRate) / refinedTau;
 }
 
 } // namespace helixx

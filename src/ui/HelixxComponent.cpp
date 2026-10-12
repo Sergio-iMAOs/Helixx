@@ -11,8 +11,12 @@ HelixxComponent::HelixxComponent(Helixx& helixxDSP)
 
     coarseFreqAttachment.reset(new SliderAttachment(apvts, ID::FMCoarseFreqID   , coarseFreqSlider));
     depthAttachment     .reset(new SliderAttachment(apvts, ID::FMDepthID        , depthSlider));
-    buttonStateChanged(&relativeButton);
+
+    // Listen before attaching: the attachment sets the initial toggle state,
+    // which is what selects the parameter edited by the range slider.
+    relativeButton.addListener(this);
     relativeAttachment  .reset(new ButtonAttachment(apvts, ID::FMIsRelativeID   , relativeButton));
+    updateRangeAttachment();
 
     coarseFreqLabel .setText("COARSE FREQ"  , juce::dontSendNotification);
     depthLabel      .setText("MOD DEPTH"    , juce::dontSendNotification);
@@ -22,8 +26,6 @@ HelixxComponent::HelixxComponent(Helixx& helixxDSP)
     depthLabel      .setJustificationType(juce::Justification::centred);
     rangeLabel      .setJustificationType(juce::Justification::centred);
     relativeLabel   .setJustificationType(juce::Justification::centred);
-
-    relativeButton.addListener(this);
 
     addAndMakeVisible(coarseFreqLabel);
     addAndMakeVisible(depthLabel);
@@ -70,23 +72,30 @@ void HelixxComponent::resized()
     rangeSlider     .setBounds(rangeBounds);
 }
 
-void HelixxComponent::buttonClicked(juce::Button *button)
+void HelixxComponent::buttonClicked(juce::Button* /*button*/)
 {
 }
 
-void HelixxComponent::buttonStateChanged(juce::Button *button)
+void HelixxComponent::buttonStateChanged(juce::Button* /*button*/)
 {
+    updateRangeAttachment();
+}
+
+void HelixxComponent::updateRangeAttachment()
+{
+    const auto isRelative = relativeButton.getToggleState();
+
+    // This also runs for hover and press state changes: only re-attach when
+    // the toggle actually flipped.
+    if (rangeAttachment != nullptr && isRelative == rangeIsRelative)
+        return;
+
     auto& apvts = helixx.getAPVTS();
 
-    // Re-attach range slider
-    if (button->getToggleState())
-    {
-        rangeAttachment.reset(new SliderAttachment(apvts, ID::FMRangeRelID  , rangeSlider));
-    }
-    else
-    {
-        rangeAttachment.reset(new SliderAttachment(apvts, ID::FMRangeMsID   , rangeSlider));
-    }
+    // Re-attach range slider (detach from the old parameter first)
+    rangeAttachment.reset();
+    rangeAttachment.reset(new SliderAttachment(apvts, isRelative ? ID::FMRangeRelID : ID::FMRangeMsID, rangeSlider));
+    rangeIsRelative = isRelative;
 }
 
 } // namespace helixx

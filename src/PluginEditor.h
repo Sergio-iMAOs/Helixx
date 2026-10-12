@@ -4,6 +4,9 @@
 #include "ui/HelixxComponent.h"
 
 //==============================================================================
+/**
+ * @brief Plugin window: a fixed-size frame around helixx::HelixxComponent.
+ */
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor
 {
 public:

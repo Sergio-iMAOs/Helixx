@@ -1,21 +1,14 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-namespace
-{
-    constexpr unsigned int NUM_CHANNELS = 6;
-} // anonymous-namespace
-
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
      : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
                       #if ! JucePlugin_IsSynth
                        .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
-                       //.withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
-                       //.withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
     helixx(*this)
@@ -94,7 +87,9 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 //==============================================================================
 void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    helixx.prepare(sampleRate, samplesPerBlock, static_cast<unsigned int>(getTotalNumInputChannels()));
+    helixx.prepare(sampleRate,
+                   static_cast<unsigned int>(juce::jmax(0, samplesPerBlock)),
+                   static_cast<unsigned int>(getTotalNumInputChannels()));
     setLatencySamples(helixx.getLatencySamples()); // report oversampling filter latency to host
 }
 
@@ -113,8 +108,8 @@ bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
     if (layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled())
         return false;
 
-    // Require matching in/out channel counts, allow anything from mono up
-    // to whatever ceiling makes sense for your DSP (e.g. 32).
+    // Each channel is processed as an independent mono voice, so require
+    // matching in/out channel counts and allow anything from mono up.
     constexpr int maxChannels = 32;
     return numIn == numOut && numIn >= 1 && numIn <= maxChannels;
 }
@@ -122,6 +117,13 @@ bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
 void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer& midiMessages)
 {
+    juce::ignoreUnused (midiMessages);
+    juce::ScopedNoDenormals noDenormals;
+
+    // Silence any output channel that has no matching input.
+    for (auto ch = getTotalNumInputChannels(); ch < getTotalNumOutputChannels(); ++ch)
+        buffer.clear (ch, 0, buffer.getNumSamples());
+
     helixx.process(buffer);
 }
 

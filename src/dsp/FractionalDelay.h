@@ -5,25 +5,45 @@
 namespace helixx
 {
 
-#pragma once
-
-#include <vector>
-
+/**
+ * @brief Single-channel circular delay line with a fractional, modulatable delay time.
+ *
+ * Samples are read with linear interpolation, so the delay time can be changed
+ * every sample (e.g. by an LFO or audio-rate modulator) without stepping.
+ * The internal buffer length is a power of 2 so that index wrapping is a bitmask.
+ *
+ * Real-time safe after construction: no allocations in the processing methods.
+ */
 class FractionalDelay
 {
 public:
-    // length: maximum delay time in samples the line must support.
-    // Internally rounded up to the next power of 2 so index wrapping
-    // can use a bitmask instead of modulo.
+    /**
+     * @brief Creates a delay line able to hold at least @p length samples of delay.
+     * @param length Maximum delay time, in samples, the line must support.
+     *               Internally rounded up to the next power of 2.
+     */
     explicit FractionalDelay(unsigned int length);
     ~FractionalDelay();
 
-    // Sets the current delay time, in samples (can be fractional).
-    // Must be in [0, bufferLength - 1].
+    /** @brief Zeroes the stored audio and rewinds the write position. */
+    void clear();
+
+    /**
+     * @brief Sets the current delay time.
+     * @param newTime Delay in samples (may be fractional). Must be in
+     *                [0, getMaxDelayInSamples()]; out-of-range values are clamped.
+     */
     void setTimeInSamples(float newTime);
 
-    // Introduces `sample` into the delay line and returns the
-    // interpolated sample read from `delayTimeSamples` samples ago.
+    /** @brief Returns the largest delay time, in samples, accepted by setTimeInSamples(). */
+    float getMaxDelayInSamples() const;
+
+    /**
+     * @brief Pushes one sample into the line and reads the delayed output.
+     * @param sample Input sample.
+     * @return The linearly interpolated sample written `delay time` samples ago
+     *         (the input itself when the delay time is 0).
+     */
     float processSample(float sample);
 
 private:

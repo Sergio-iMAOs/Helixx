@@ -1,19 +1,12 @@
 #include "FractionalDelay.h"
+#include <algorithm>
 #include <cassert>
-#include <cmath> // std::floor
 
 namespace helixx
 {
 
 unsigned int FractionalDelay::nextPowerOfTwo(unsigned int value)
 {
-    if (value == 0)
-        return 1;
-
-    // If already a power of 2, keep it as-is.
-    if ((value & (value - 1)) == 0)
-        return value;
-
     unsigned int result = 1;
     while (result < value)
         result <<= 1;
@@ -21,18 +14,31 @@ unsigned int FractionalDelay::nextPowerOfTwo(unsigned int value)
 }
 
 FractionalDelay::FractionalDelay(unsigned int length)
-    : buffer(nextPowerOfTwo(length), 0.0f),
-      bufferLength(nextPowerOfTwo(length)),
+    // Two extra samples: one because the newest sample is written before
+    // reading, one for the interpolation neighbour at the maximum delay.
+    : buffer(nextPowerOfTwo(length + 2), 0.0f),
+      bufferLength(static_cast<unsigned int>(buffer.size())),
       bufferMask(bufferLength - 1)
 {
 }
 
 FractionalDelay::~FractionalDelay() = default;
 
+void FractionalDelay::clear()
+{
+    std::fill(buffer.begin(), buffer.end(), 0.0f);
+    writeIndex = 0;
+}
+
 void FractionalDelay::setTimeInSamples(float newTime)
 {
-    assert(newTime >= 0.0f && newTime <= static_cast<float>(bufferLength - 1));
-    delayTimeSamples = newTime;
+    assert(newTime >= 0.0f && newTime <= getMaxDelayInSamples());
+    delayTimeSamples = std::clamp(newTime, 0.0f, getMaxDelayInSamples());
+}
+
+float FractionalDelay::getMaxDelayInSamples() const
+{
+    return static_cast<float>(bufferLength - 2);
 }
 
 float FractionalDelay::processSample(float sample)
@@ -40,15 +46,15 @@ float FractionalDelay::processSample(float sample)
     // Write the new sample into the line first.
     buffer[writeIndex] = sample;
 
-    // Compute the (possibly fractional) read position, `delayTimeSamples`
-    // behind the write pointer, wrapped into the buffer.
-    float readPos = static_cast<float>(writeIndex) - delayTimeSamples;
-    while (readPos < 0.0f)
-        readPos += static_cast<float>(bufferLength);
+    // Split the delay into integer and fractional parts. Working on the delay
+    // (rather than on an absolute float read position) keeps the fractional
+    // precision independent of the buffer length.
+    const unsigned int delayInt = static_cast<unsigned int>(delayTimeSamples);
+    const float frac = delayTimeSamples - static_cast<float>(delayInt);
 
-    const unsigned int index0 = static_cast<unsigned int>(readPos) & bufferMask;
-    const unsigned int index1 = (index0 + 1) & bufferMask;
-    const float frac = readPos - std::floor(readPos);
+    // Unsigned wrap-around is fine here because bufferLength is a power of 2.
+    const unsigned int index0 = (writeIndex - delayInt) & bufferMask; // delayInt samples ago
+    const unsigned int index1 = (index0 - 1) & bufferMask;            // one sample older
 
     // Linear interpolation between the two nearest samples.
     const float delayedSample = buffer[index0] + frac * (buffer[index1] - buffer[index0]);

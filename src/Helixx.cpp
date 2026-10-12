@@ -39,7 +39,7 @@ Helixx::Helixx(juce::AudioProcessor& processor)
                 "FM Range ms", // parameter name
                 juce::NormalisableRange<float>(
                     0.f,    // minimum value
-                    20.f,   // maximum value
+                    DelayFM::maxModRangeMs, // maximum value
                     0.1f,   // Interval
                     0.4f,   // Skew factor
                     false   // Symmetric skew
@@ -48,37 +48,33 @@ Helixx::Helixx(juce::AudioProcessor& processor)
                 juce::AudioParameterFloatAttributes()
                     .withStringFromValueFunction
                     (
-                        [](float value, int) { return juce::String(value) + " ms"; }
+                        [](float value, int) { return juce::String(value, 1) + " ms"; }
                     )
             ),
             std::make_unique<juce::AudioParameterFloat> (
                 juce::ParameterID(ID::FMRangeRelID, VERSION_HINT), // parameterID
                 "FM Range st", // parameter name
                 juce::NormalisableRange<float>(
-                    std::exp2(0.f / 12.f),    // minimum value
-                    std::exp2(24.0f / 12.f),  // maximum value
-                    0.001f,   // Interval
+                    1.0f,                       // minimum value (0 st)
+                    DelayFM::maxModRangeRatio,  // maximum value (24 st)
+                    0.001f, // Interval
                     0.5f,   // Skew factor
                     false   // Symmetric skew
                 ),
-                std::exp2(12.0f / 12.0f),   // default value
+                2.0f,   // default value (12 st)
                 juce::AudioParameterFloatAttributes()
                     .withStringFromValueFunction
                     (
                         [](float value, int)
                             {
-                                if (value == 0.f)
-                                    return juce::String("0");
-                                else
-                                    return juce::String(std::log2(value) * 12.f) + " st";
+                                return juce::String(std::log2(value) * 12.f, 2) + " st";
                             }
                     )
                     .withValueFromStringFunction
                     (
                         [](const juce::String& text)
                             {
-                                auto value = text.getFloatValue();
-                                return std::exp2(value * 0.08333333333);
+                                return std::exp2(text.getFloatValue() / 12.f);
                             }
                     )
             ),
@@ -89,7 +85,12 @@ Helixx::Helixx(juce::AudioProcessor& processor)
             )
         }
     )
-{       
+{
+    coarseFreqParam = parameters.getRawParameterValue(ID::FMCoarseFreqID);
+    depthParam      = parameters.getRawParameterValue(ID::FMDepthID);
+    rangeMsParam    = parameters.getRawParameterValue(ID::FMRangeMsID);
+    rangeRelParam   = parameters.getRawParameterValue(ID::FMRangeRelID);
+    isRelativeParam = parameters.getRawParameterValue(ID::FMIsRelativeID);
 }
 
 Helixx::~Helixx()
@@ -98,46 +99,68 @@ Helixx::~Helixx()
 
 void Helixx::prepare(double sampleRate, unsigned int samplesPerBlock, unsigned int numChannels)
 {
+    oversampling.reset();
+    maxBlockSize = samplesPerBlock;
+    numPreparedChannels = numChannels;
+
+    if (numChannels == 0 || samplesPerBlock == 0)
+        return;
+
     oversampling = std::make_unique<juce::dsp::Oversampling<float>>(
         numChannels,
-        oversamplingFactor,
+        oversamplingOrder,
         juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR,
         true,  // isMaximumQuality
         false  // isIntegerLatency (set true if you need integer-sample latency reporting)
     );
 
-    oversampling->initProcessing((samplesPerBlock));
+    oversampling->initProcessing(samplesPerBlock);
 
-    sampleRate      *= oversamplingFactor;
-    samplesPerBlock *= oversamplingFactor;
-
-    delayFM.prepare(sampleRate, samplesPerBlock, numChannels);
+    // Load the parameters first so the DSP starts on their current values
+    // instead of ramping to them from its defaults.
+    updateParameters();
+    delayFM.prepare(sampleRate * static_cast<double>(oversampling->getOversamplingFactor()), numChannels);
 
     channelPtrs.resize(numChannels);
 }
 
 void Helixx::process(juce::AudioBuffer<float> &buffer)
 {
+    if (oversampling == nullptr)
+        return;
+
     // Update parameters
     updateParameters();
 
-    // Upsample
-    juce::dsp::AudioBlock<float> block(buffer);
-    juce::dsp::AudioBlock<float> oversampledBlock = oversampling->processSamplesUp(block);
+    const auto numChannels = juce::jmin(static_cast<size_t>(buffer.getNumChannels()),
+                                        static_cast<size_t>(numPreparedChannels));
+    const auto numSamples  = static_cast<size_t>(buffer.getNumSamples());
+    if (numChannels == 0)
+        return;
 
-    const auto numFrames    = static_cast<unsigned int>(oversampledBlock.getNumSamples());
-    const auto numChannels  = static_cast<int>(oversampledBlock.getNumChannels());
+    auto block = juce::dsp::AudioBlock<float>(buffer).getSubsetChannelBlock(0, numChannels);
 
-    // Get pointers
-    for (int ch = 0; ch < numChannels; ++ch)
-        channelPtrs[ch] = oversampledBlock.getChannelPointer(static_cast<size_t>(ch));
+    // The oversampler can't take more than maxBlockSize samples at once, and
+    // hosts are allowed to send larger blocks than announced: split them.
+    for (size_t offset = 0; offset < numSamples; offset += maxBlockSize)
+    {
+        auto subBlock = block.getSubBlock(offset, juce::jmin(static_cast<size_t>(maxBlockSize), numSamples - offset));
 
+        // Upsample
+        auto oversampledBlock = oversampling->processSamplesUp(subBlock);
 
-    // Process
-    delayFM.process(channelPtrs.data(), numFrames);
+        // Get pointers
+        for (size_t ch = 0; ch < numChannels; ++ch)
+            channelPtrs[ch] = oversampledBlock.getChannelPointer(ch);
 
-    // Downsample
-    oversampling->processSamplesDown(block);
+        // Process
+        delayFM.process(channelPtrs.data(),
+                        static_cast<unsigned int>(numChannels),
+                        static_cast<unsigned int>(oversampledBlock.getNumSamples()));
+
+        // Downsample
+        oversampling->processSamplesDown(subBlock);
+    }
 }
 
 juce::AudioProcessorValueTreeState &Helixx::getAPVTS()
@@ -147,16 +170,16 @@ juce::AudioProcessorValueTreeState &Helixx::getAPVTS()
 
 int Helixx::getLatencySamples() const
 {
-    return oversampling ? static_cast<int>(oversampling->getLatencyInSamples()) : 0;
+    return oversampling ? juce::roundToInt(oversampling->getLatencyInSamples()) : 0;
 }
 
 void Helixx::updateParameters()
 {
-    delayFM .setCoarseFreq      (*parameters.getRawParameterValue(ID::FMCoarseFreqID));
-    delayFM .setDepth           (*parameters.getRawParameterValue(ID::FMDepthID));
-    delayFM .setModRangeMs      (*parameters.getRawParameterValue(ID::FMRangeMsID));
-    delayFM .setModRangeRatio   (*parameters.getRawParameterValue(ID::FMRangeRelID));
-    delayFM .setRelativeToPitch (static_cast<bool>(*parameters.getRawParameterValue(ID::FMIsRelativeID)));
+    delayFM .setCoarseFreq      (coarseFreqParam->load());
+    delayFM .setDepth           (depthParam->load());
+    delayFM .setModRangeMs      (rangeMsParam->load());
+    delayFM .setModRangeRatio   (rangeRelParam->load());
+    delayFM .setRelativeToPitch (isRelativeParam->load() >= 0.5f);
 }
 
 } // namespace helixx
