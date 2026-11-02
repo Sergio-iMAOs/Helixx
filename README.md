@@ -2,6 +2,8 @@
 
 **Adaptive FM for hexaphonic guitars and other multichannel sources.** Helixx is an audio effect that follows the pitch of each channel on its own and frequency-modulates that channel with its own modulator, so a whole chord can go through FM without turning to mud.
 
+More on the [Helixx page](https://synthworldaudio.com/synths/helixx/) at SynthWorld.
+
 ![The Helixx plugin window: controls on the left, a spectrum with sideband markers on the right, and a strip of six voices below it](docs/helixx-ui.png)
 
 <sub>Adaptive FM on a hexaphonic guitar recording. All six strings are tracked, and string 5 is selected in the spectrum: the purple curve is the input, the black one the output, and the orange lines mark the pitch and where its sidebands should land.</sub>
@@ -54,18 +56,19 @@ The relative index doesn't depend on the pitch at all. In Adaptive FM the spectr
 
 ## Building
 
-You need CMake 3.24 or later, Ninja, a C++17 compiler and, on Linux, [JUCE's dependencies](https://github.com/juce-framework/JUCE/blob/master/docs/Linux%20Dependencies.md).
+You need Git, CMake 3.24 or later, Ninja, a C++17 compiler and, on Linux, [JUCE's dependencies](https://github.com/juce-framework/JUCE/blob/master/docs/Linux%20Dependencies.md).
 
-JUCE isn't included in this repository, so clone it into `modules/JUCE`:
+JUCE isn't included in this repository. CMake downloads version 9.0.4 the first time you configure:
 
 ```sh
 git clone https://github.com/Sergio-iMAOs/Helixx.git
 cd Helixx
-git clone --depth 1 --branch 9.0.4 https://github.com/juce-framework/JUCE.git modules/JUCE
 
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target Helixx_All
 ```
+
+To use a copy of JUCE you already have, add `-DFETCHCONTENT_SOURCE_DIR_JUCE=/path/to/JUCE` to the first `cmake` command.
 
 This builds the VST3 and the Standalone app, plus the AU on macOS, into `build/src/Helixx_artefacts/Release/`. The build also copies the plugin into your user plugin folder, which is `~/.vst3` on Linux.
 

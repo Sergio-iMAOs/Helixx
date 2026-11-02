@@ -15,9 +15,10 @@ You should have received a copy of the GNU Affero General Public License along w
 | Everything in this repository not listed below | AGPL-3.0-or-later ([LICENSE](LICENSE)) |
 | `assets/Oscilla-Regular.ttf` | SIL Open Font License 1.1, with Reserved Font Name "Oscilla" ([assets/OFL.txt](assets/OFL.txt)) |
 | `src/ui/SynthWorldLogo.cpp` and `src/ui/SynthWorldLogo.h` | AGPL-3.0-or-later, subject to the trademark term below. Copyright (C) 2025-2026 Sergio Ramos Galindo |
-| JUCE, in `modules/JUCE` (not part of this repository) | AGPLv3 for Helixx's use, under JUCE's own license terms |
+| `src/ui/HelixxLogo.cpp`, `src/ui/HelixxLookAndFeel.cpp`, `src/ui/HelixxLookAndFeel.h`, `src/ui/SpectrumScale.cpp`, `src/ui/SpectrumScale.h`, `src/ui/SpectrumUI.cpp` and `src/ui/SpectrumUI.h` | AGPL-3.0-or-later. Contain code ported from SynthWorld. Copyright (C) 2025-2026 Sergio Ramos Galindo |
+| JUCE, which CMake downloads when configuring (not part of this repository) | AGPLv3 for Helixx's use, under JUCE's own license terms |
 
-Only the files listed here are licensed. No other part of SynthWorld is licensed, and its own license still applies to it.
+Of SynthWorld, only what is in this repository is licensed. No other part of SynthWorld is licensed, and its own license still applies to it.
 
 ## Additional term: SynthWorld name and logo
 

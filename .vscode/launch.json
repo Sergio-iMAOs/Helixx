@@ -6,7 +6,6 @@
       "type": "lldb",
       "request": "launch",
       "program": "/usr/local/bin/reaper",
-      "args": ["test_reaper.RPP"],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["cpp"]
     }
