@@ -29,6 +29,15 @@ public:
     /** @brief What's left inside a panel for what's on it. */
     static juce::Rectangle<int> getPanelContentBounds(juce::Rectangle<int> bounds);
 
+    /** @brief The window's header: Helixx's logo at the left, a line under all of it. */
+    void drawHeader(juce::Graphics& g, juce::Rectangle<float> bounds) const;
+
+    /** @brief SynthWorld's logo, as large as fits in `bounds`. */
+    void drawSynthWorldLogo(juce::Graphics& g, juce::Rectangle<float> bounds) const;
+
+    /** @brief Where SynthWorld's logo goes in a header: at its right end. */
+    static juce::Rectangle<int> getSynthWorldLogoBounds(juce::Rectangle<int> header);
+
     /** @brief A frequency marked behind a spectrum, with its text at the bottom. */
     struct FrequencyMarker
     {

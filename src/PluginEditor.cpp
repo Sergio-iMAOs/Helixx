@@ -14,7 +14,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     // sliders make their text boxes with the look's colours when they are.
     setLookAndFeel(&lookAndFeel);
 
-    setSize (960, 600);
+    setSize (960, 600 + helixx::HelixxComponent::HEADER_HEIGHT);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()

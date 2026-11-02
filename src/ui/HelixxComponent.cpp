@@ -3,6 +3,26 @@
 namespace helixx
 {
 
+namespace
+{
+    constexpr auto SYNTHWORLD_URL = "https://synthworldaudio.com/";
+}
+
+HelixxComponent::SynthWorldButton::SynthWorldButton()
+    : juce::Button("SynthWorld")
+{
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    setWantsKeyboardFocus(false);
+
+    onClick = [] { juce::URL(SYNTHWORLD_URL).launchInDefaultBrowser(); };
+}
+
+void HelixxComponent::SynthWorldButton::paintButton(juce::Graphics& g, bool /*isHighlighted*/, bool /*isDown*/)
+{
+    if (auto* look = dynamic_cast<HelixxLookAndFeel*>(&getLookAndFeel()))
+        look->drawSynthWorldLogo(g, getLocalBounds().toFloat());
+}
+
 HelixxComponent::HelixxComponent(Helixx& helixxDSP)
     :
     helixx(helixxDSP),
@@ -37,6 +57,7 @@ HelixxComponent::HelixxComponent(Helixx& helixxDSP)
     rangeLabel      .setJustificationType(juce::Justification::centred);
     relativeLabel   .setJustificationType(juce::Justification::centredLeft);
 
+    addAndMakeVisible(synthWorldButton);
     addAndMakeVisible(algorithmBox);
 
     addAndMakeVisible(coarseFreqLabel);
@@ -59,14 +80,22 @@ HelixxComponent::~HelixxComponent()
     relativeButton.removeListener(this);
 }
 
-void HelixxComponent::paint(juce::Graphics& /*g*/)
+void HelixxComponent::paint(juce::Graphics& g)
 {
+    if (auto* look = dynamic_cast<HelixxLookAndFeel*>(&getLookAndFeel()))
+        look->drawHeader(g, headerBounds.toFloat());
 }
 
 void HelixxComponent::resized()
 {
     constexpr auto margin = 2;
     auto bounds = getLocalBounds().reduced(margin);
+
+    constexpr auto headerGap = 6;
+
+    headerBounds = bounds.removeFromTop(HEADER_HEIGHT - headerGap);
+    bounds.removeFromTop(headerGap);
+    synthWorldButton.setBounds(HelixxLookAndFeel::getSynthWorldLogoBounds(headerBounds));
 
     constexpr auto controlsWidth = 288;
     constexpr auto displaysGap = 8;

@@ -27,9 +27,11 @@ juce_add_binary_data(${PROJECT_NAME}Assets
 target_sources(${PROJECT_NAME}
     PRIVATE
         ui/HelixxComponent.cpp
+        ui/HelixxLogo.cpp
         ui/HelixxLookAndFeel.cpp
         ui/SpectrumScale.cpp
         ui/SpectrumUI.cpp
+        ui/SynthWorldLogo.cpp
         ui/VoiceStripUI.cpp
         dsp/PitchDetector.cpp
         dsp/Oscillator.cpp

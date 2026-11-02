@@ -10,10 +10,10 @@ namespace helixx
 {
 
 /**
- * @brief Everything in the plugin's window: at the left the controls (algorithm
- *        selector, coarse frequency, depth and range sliders plus the
- *        relative-range toggle), at the right the displays (the spectrum over
- *        the voice strip).
+ * @brief Everything in the plugin's window: the header with the logos,
+ *        SynthWorld's a link to its site, and under it, at the left the controls (algorithm selector, coarse
+ *        frequency, depth and range sliders plus the relative-range toggle),
+ *        at the right the displays (the spectrum over the voice strip).
  *
  * The single range slider edits either the millisecond or the relative range
  * parameter, following the state of the toggle. The range controls only act
@@ -22,6 +22,9 @@ namespace helixx
 class HelixxComponent: public juce::Component, private juce::Button::Listener
 {
 public:
+    /** @brief The header's height, with the room under it: what it adds to the window's. */
+    static constexpr int HEADER_HEIGHT = 44;
+
     /**
      * @brief Builds the controls and attaches them to the effect's parameters.
      * @param helixxDSP The effect to control; must outlive this component.
@@ -38,7 +41,19 @@ public:
     void buttonStateChanged (juce::Button* button) override;
 
 private:
+    /** @brief SynthWorld's logo in the header: a click opens its site in the web browser. */
+    class SynthWorldButton final: public juce::Button
+    {
+    public:
+        SynthWorldButton();
+
+        void paintButton(juce::Graphics& g, bool isHighlighted, bool isDown) override;
+    };
+
     Helixx& helixx;
+
+    juce::Rectangle<int> headerBounds;
+    SynthWorldButton synthWorldButton;
 
     juce::ComboBox algorithmBox;
 

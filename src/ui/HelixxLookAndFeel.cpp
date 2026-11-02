@@ -1,5 +1,8 @@
 #include "HelixxLookAndFeel.h"
 
+#include "HelixxLogo.h"
+#include "SynthWorldLogo.h"
+
 #include <BinaryData.h>
 
 #include <algorithm>
@@ -19,6 +22,12 @@ namespace
     constexpr auto PANEL_PADDING    = 3;
     constexpr auto PANEL_LIGHTENING = 0.035f;   // Its fill: how far the background goes to the foreground
     constexpr auto PANEL_OUTLINE    = 0.1f;     // The surface's alpha
+
+    // The header
+    constexpr auto HELIXX_LOGO_HEIGHT     = 28.f;
+    constexpr auto SYNTHWORLD_LOGO_HEIGHT = 18;
+    constexpr auto HEADER_INSET           = 6;      // From its ends to the logos
+    constexpr auto HEADER_LINE            = 1.f;
 
     // A control's box
     constexpr auto CONTROL_MARGIN           = 1.f;
@@ -177,6 +186,28 @@ void HelixxLookAndFeel::drawPanel(juce::Graphics& g, juce::Rectangle<float> boun
 juce::Rectangle<int> HelixxLookAndFeel::getPanelContentBounds(juce::Rectangle<int> bounds)
 {
     return bounds.reduced(PANEL_MARGIN + PANEL_PADDING);
+}
+
+void HelixxLookAndFeel::drawHeader(juce::Graphics& g, juce::Rectangle<float> bounds) const
+{
+    // --- The line under it ---
+    g.setColour(palette.foreground.withAlpha(CONTROL_OUTLINE_ALPHA));
+    g.fillRect(bounds.removeFromBottom(HEADER_LINE));
+
+    // --- Helixx's logo at the left, standing in the middle ---
+    HelixxLogo::drawWide(g, bounds.reduced(static_cast<float>(HEADER_INSET), 0.f).removeFromLeft(HELIXX_LOGO_HEIGHT * HelixxLogo::WIDE_ASPECT),
+                         palette.accent, palette.foreground, palette.foreground);
+}
+
+void HelixxLookAndFeel::drawSynthWorldLogo(juce::Graphics& g, juce::Rectangle<float> bounds) const
+{
+    SynthWorldLogo::drawWide(g, bounds, palette.accent, palette.foreground);
+}
+
+juce::Rectangle<int> HelixxLookAndFeel::getSynthWorldLogoBounds(juce::Rectangle<int> header)
+{
+    const auto width = static_cast<int>(std::ceil(static_cast<float>(SYNTHWORLD_LOGO_HEIGHT) * SynthWorldLogo::getWideAspect()));
+    return header.reduced(HEADER_INSET, 0).removeFromRight(width).withSizeKeepingCentre(width, SYNTHWORLD_LOGO_HEIGHT);
 }
 
 /**
