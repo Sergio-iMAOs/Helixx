@@ -81,4 +81,6 @@ Helixx is at version 0.0.1 and under active development, so parameters and sound
 
 ## License
 
-Helixx doesn't have a license yet, so all rights are reserved for now. It is built on [JUCE](https://juce.com/), which is available under the AGPLv3 or a commercial license. The Oscilla typeface and the SynthWorld name and logo belong to the project's author.
+Helixx is free software, licensed under the [GNU Affero General Public License v3.0 or later](LICENSE). It is built on [JUCE](https://juce.com/), which it uses under the AGPLv3.
+
+The Oscilla typeface is licensed under the [SIL Open Font License 1.1](assets/OFL.txt). The SynthWorld name and logo aren't licensed for use, even though the code that draws the logo is. [NOTICE.md](NOTICE.md) has the details.

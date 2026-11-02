@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025-2026 Sergio Ramos Galindo
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// The SynthWorld name and logo are not licensed: see NOTICE.md.
+
 #include "SynthWorldLogo.h"
 
 #include <algorithm>
