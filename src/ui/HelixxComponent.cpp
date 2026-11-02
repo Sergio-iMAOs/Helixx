@@ -5,27 +5,30 @@ namespace helixx
 
 namespace
 {
+    constexpr auto HELIXX_URL     = "https://synthworldaudio.com/synths/helixx/";
     constexpr auto SYNTHWORLD_URL = "https://synthworldaudio.com/";
 }
 
-HelixxComponent::SynthWorldButton::SynthWorldButton()
-    : juce::Button("SynthWorld")
+HelixxComponent::LogoButton::LogoButton(const juce::String& name, const juce::URL& url, Draw drawLogo)
+    : juce::Button(name), draw(drawLogo)
 {
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(false);
 
-    onClick = [] { juce::URL(SYNTHWORLD_URL).launchInDefaultBrowser(); };
+    onClick = [url] { url.launchInDefaultBrowser(); };
 }
 
-void HelixxComponent::SynthWorldButton::paintButton(juce::Graphics& g, bool /*isHighlighted*/, bool /*isDown*/)
+void HelixxComponent::LogoButton::paintButton(juce::Graphics& g, bool /*isHighlighted*/, bool /*isDown*/)
 {
     if (auto* look = dynamic_cast<HelixxLookAndFeel*>(&getLookAndFeel()))
-        look->drawSynthWorldLogo(g, getLocalBounds().toFloat());
+        (look->*draw)(g, getLocalBounds().toFloat());
 }
 
 HelixxComponent::HelixxComponent(Helixx& helixxDSP)
     :
     helixx(helixxDSP),
+    helixxButton("Helixx", juce::URL(HELIXX_URL), &HelixxLookAndFeel::drawHelixxLogo),
+    synthWorldButton("SynthWorld", juce::URL(SYNTHWORLD_URL), &HelixxLookAndFeel::drawSynthWorldLogo),
     spectrum(helixxDSP),
     voiceStrip(helixxDSP.getVoiceMonitor())
 {
@@ -57,6 +60,7 @@ HelixxComponent::HelixxComponent(Helixx& helixxDSP)
     rangeLabel      .setJustificationType(juce::Justification::centred);
     relativeLabel   .setJustificationType(juce::Justification::centredLeft);
 
+    addAndMakeVisible(helixxButton);
     addAndMakeVisible(synthWorldButton);
     addAndMakeVisible(algorithmBox);
 
@@ -95,6 +99,7 @@ void HelixxComponent::resized()
 
     headerBounds = bounds.removeFromTop(HEADER_HEIGHT - headerGap);
     bounds.removeFromTop(headerGap);
+    helixxButton    .setBounds(HelixxLookAndFeel::getHelixxLogoBounds(headerBounds));
     synthWorldButton.setBounds(HelixxLookAndFeel::getSynthWorldLogoBounds(headerBounds));
 
     constexpr auto controlsWidth = 288;

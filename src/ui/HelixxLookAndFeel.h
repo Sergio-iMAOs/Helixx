@@ -29,11 +29,17 @@ public:
     /** @brief What's left inside a panel for what's on it. */
     static juce::Rectangle<int> getPanelContentBounds(juce::Rectangle<int> bounds);
 
-    /** @brief The window's header: Helixx's logo at the left, a line under all of it. */
+    /** @brief The window's header, behind its logos: the line under it. */
     void drawHeader(juce::Graphics& g, juce::Rectangle<float> bounds) const;
+
+    /** @brief Helixx's logo, as large as fits in `bounds`. */
+    void drawHelixxLogo(juce::Graphics& g, juce::Rectangle<float> bounds) const;
 
     /** @brief SynthWorld's logo, as large as fits in `bounds`. */
     void drawSynthWorldLogo(juce::Graphics& g, juce::Rectangle<float> bounds) const;
+
+    /** @brief Where Helixx's logo goes in a header: at its left end. */
+    static juce::Rectangle<int> getHelixxLogoBounds(juce::Rectangle<int> header);
 
     /** @brief Where SynthWorld's logo goes in a header: at its right end. */
     static juce::Rectangle<int> getSynthWorldLogoBounds(juce::Rectangle<int> header);

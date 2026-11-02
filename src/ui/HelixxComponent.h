@@ -10,8 +10,8 @@ namespace helixx
 {
 
 /**
- * @brief Everything in the plugin's window: the header with the logos,
- *        SynthWorld's a link to its site, and under it, at the left the controls (algorithm selector, coarse
+ * @brief Everything in the plugin's window: the header with the logos, each
+ *        a link to its site, and under it, at the left the controls (algorithm selector, coarse
  *        frequency, depth and range sliders plus the relative-range toggle),
  *        at the right the displays (the spectrum over the voice strip).
  *
@@ -41,19 +41,26 @@ public:
     void buttonStateChanged (juce::Button* button) override;
 
 private:
-    /** @brief SynthWorld's logo in the header: a click opens its site in the web browser. */
-    class SynthWorldButton final: public juce::Button
+    /** @brief A logo in the header: a click opens its site in the web browser. */
+    class LogoButton final: public juce::Button
     {
     public:
-        SynthWorldButton();
+        /** @brief What draws the logo. */
+        using Draw = void (HelixxLookAndFeel::*)(juce::Graphics&, juce::Rectangle<float>) const;
+
+        LogoButton(const juce::String& name, const juce::URL& url, Draw drawLogo);
 
         void paintButton(juce::Graphics& g, bool isHighlighted, bool isDown) override;
+
+    private:
+        const Draw draw;
     };
 
     Helixx& helixx;
 
     juce::Rectangle<int> headerBounds;
-    SynthWorldButton synthWorldButton;
+    LogoButton helixxButton;
+    LogoButton synthWorldButton;
 
     juce::ComboBox algorithmBox;
 
