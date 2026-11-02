@@ -3,13 +3,17 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include "../Helixx.h"
+#include "SpectrumUI.h"
+#include "VoiceStripUI.h"
 
 namespace helixx
 {
 
 /**
- * @brief Control panel of the effect: algorithm selector, coarse frequency,
- *        depth and range sliders plus the relative-range toggle.
+ * @brief Everything in the plugin's window: at the left the controls (algorithm
+ *        selector, coarse frequency, depth and range sliders plus the
+ *        relative-range toggle), at the right the displays (the spectrum over
+ *        the voice strip).
  *
  * The single range slider edits either the millisecond or the relative range
  * parameter, following the state of the toggle. The range controls only act
@@ -60,6 +64,9 @@ private:
     juce::Label depthLabel;
     juce::Label rangeLabel;
     juce::Label relativeLabel;
+
+    SpectrumUI spectrum;
+    VoiceStripUI voiceStrip;
 
     typedef juce::AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
     typedef juce::AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;

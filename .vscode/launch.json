@@ -5,7 +5,7 @@
       "name": "Debug Plugin in REAPER",
       "type": "lldb",
       "request": "launch",
-      "program": "/Applications/REAPER.app/Contents/MacOS/REAPER",
+      "program": "/usr/local/bin/reaper",
       "args": ["test_reaper.RPP"],
       "cwd": "${workspaceFolder}",
       "sourceLanguages": ["cpp"]

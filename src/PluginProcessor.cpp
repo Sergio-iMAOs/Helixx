@@ -110,8 +110,7 @@ bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
 
     // Each channel is processed as an independent mono voice, so require
     // matching in/out channel counts and allow anything from mono up.
-    constexpr int maxChannels = 32;
-    return numIn == numOut && numIn >= 1 && numIn <= maxChannels;
+    return numIn == numOut && numIn >= 1 && numIn <= helixx::VoiceMonitor::maxChannels;
 }
 
 void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,

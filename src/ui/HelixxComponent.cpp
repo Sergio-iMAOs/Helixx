@@ -5,7 +5,9 @@ namespace helixx
 
 HelixxComponent::HelixxComponent(Helixx& helixxDSP)
     :
-    helixx(helixxDSP)
+    helixx(helixxDSP),
+    spectrum(helixxDSP),
+    voiceStrip(helixxDSP.getVoiceMonitor())
 {
     auto& apvts = helixx.getAPVTS();
 
@@ -45,6 +47,11 @@ HelixxComponent::HelixxComponent(Helixx& helixxDSP)
     addAndMakeVisible(depthSlider);
     addAndMakeVisible(rangeSlider);
     addAndMakeVisible(relativeButton);
+
+    addAndMakeVisible(spectrum);
+    addAndMakeVisible(voiceStrip);
+
+    voiceStrip.onNumCellsChanged = [this] { resized(); };
 }
 
 HelixxComponent::~HelixxComponent()
@@ -60,6 +67,17 @@ void HelixxComponent::resized()
 {
     constexpr auto margin = 2;
     auto bounds = getLocalBounds().reduced(margin);
+
+    constexpr auto controlsWidth = 288;
+    constexpr auto displaysGap = 8;
+
+    // Displays at the right: the spectrum over the voice strip
+    auto displayBounds = bounds.withTrimmedLeft(controlsWidth + displaysGap);
+    bounds.setWidth(controlsWidth);
+
+    voiceStrip.setBounds(displayBounds.removeFromBottom(voiceStrip.getIdealHeight(displayBounds.getWidth())));
+    displayBounds.removeFromBottom(displaysGap);
+    spectrum.setBounds(displayBounds);
 
     constexpr auto labelHeight = 20;
     constexpr auto algorithmHeight = 24;

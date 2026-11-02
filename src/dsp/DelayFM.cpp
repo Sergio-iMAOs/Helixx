@@ -207,6 +207,12 @@ void DelayFM::setRelativeToPitch(bool isRelative)
     isRelativeToPitch = isRelative;
 }
 
+float DelayFM::getDetectedPitch(unsigned int channel) const
+{
+    assert(channel < pitchDetectors.size());
+    return pitchDetectors[channel].getPitch();
+}
+
 void DelayFM::clearAudioState()
 {
     for (auto& delayLine : delayLines)

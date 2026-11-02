@@ -111,6 +111,8 @@ void Helixx::prepare(double sampleRate, unsigned int samplesPerBlock, unsigned i
     maxBlockSize = samplesPerBlock;
     numPreparedChannels = numChannels;
 
+    voiceMonitor.prepare(sampleRate, static_cast<int>(numChannels));
+
     if (numChannels == 0 || samplesPerBlock == 0)
         return;
 
@@ -146,6 +148,8 @@ void Helixx::process(juce::AudioBuffer<float> &buffer)
     if (numChannels == 0)
         return;
 
+    voiceMonitor.pushInput(buffer);
+
     auto block = juce::dsp::AudioBlock<float>(buffer).getSubsetChannelBlock(0, numChannels);
 
     // The oversampler can't take more than maxBlockSize samples at once, and
@@ -169,6 +173,11 @@ void Helixx::process(juce::AudioBuffer<float> &buffer)
         // Downsample
         oversampling->processSamplesDown(subBlock);
     }
+
+    voiceMonitor.pushOutput(buffer);
+
+    for (size_t ch = 0; ch < numChannels; ++ch)
+        voiceMonitor.setDetectedPitch(static_cast<int>(ch), delayFM.getDetectedPitch(static_cast<unsigned int>(ch)));
 }
 
 juce::AudioProcessorValueTreeState &Helixx::getAPVTS()
@@ -179,6 +188,40 @@ juce::AudioProcessorValueTreeState &Helixx::getAPVTS()
 int Helixx::getLatencySamples() const
 {
     return oversampling ? juce::roundToInt(oversampling->getLatencyInSamples()) : 0;
+}
+
+VoiceMonitor& Helixx::getVoiceMonitor()
+{
+    return voiceMonitor;
+}
+
+float Helixx::getCoarseFreq() const
+{
+    return coarseFreqParam->load();
+}
+
+float Helixx::getDepth() const
+{
+    return depthParam->load();
+}
+
+std::optional<float> Helixx::getModulationIndex(float pitchHz) const
+{
+    if (static_cast<Algorithm>(juce::roundToInt(algorithmParam->load())) != Algorithm::AdaptiveFM)
+        return std::nullopt;
+
+    const auto depth = depthParam->load();
+    const auto pi    = juce::MathConstants<float>::pi;
+
+    // The delay swings by depth * range / 2 around its centre, and a delay of
+    // d seconds shifts the phase of a frequency f by 2 pi f d
+    if (isRelativeParam->load() >= 0.5f)
+        return pi * depth * (1.f - 1.f / rangeRelParam->load());
+
+    if (pitchHz <= 0.f)
+        return std::nullopt;
+
+    return pi * pitchHz * depth * rangeMsParam->load() * 0.001f;
 }
 
 void Helixx::updateParameters()

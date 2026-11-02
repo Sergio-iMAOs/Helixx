@@ -28,11 +28,15 @@ target_sources(${PROJECT_NAME}
     PRIVATE
         ui/HelixxComponent.cpp
         ui/HelixxLookAndFeel.cpp
+        ui/SpectrumScale.cpp
+        ui/SpectrumUI.cpp
+        ui/VoiceStripUI.cpp
         dsp/PitchDetector.cpp
         dsp/Oscillator.cpp
         dsp/FractionalDelay.cpp
         dsp/DelayFM.cpp
         Helixx.cpp
+        VoiceMonitor.cpp
         PluginEditor.cpp
         PluginProcessor.cpp)
 

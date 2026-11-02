@@ -74,6 +74,40 @@ namespace
     constexpr auto MENU_TICK_SIZE       = 10.f;     // At most
     constexpr auto MENU_TICK_THICKNESS  = 1.5f;
 
+    // A display's box
+    constexpr auto DISPLAY_CORNER        = 2.f;
+    constexpr auto DISPLAY_OUTLINE_ALPHA = 0.3f;    // The surface's
+    constexpr auto DISPLAY_FILL_ALPHA    = 0.45f;   // The accent's, under a curve at its most
+
+    // A spectrum
+    constexpr auto SPECTRUM_MARGIN             = 5.f;
+    constexpr auto SPECTRUM_CURVE_THICKNESS    = 1.5f;
+    constexpr auto SPECTRUM_INPUT_THICKNESS    = 1.f;
+    constexpr auto SPECTRUM_INPUT_ALPHA        = 0.6f;     // The accent's
+    constexpr auto SPECTRUM_UNITY_ALPHA        = 0.25f;
+    constexpr auto SPECTRUM_LINE_ALPHA         = 0.12f;
+    constexpr auto SPECTRUM_MINOR_LINE_ALPHA   = 0.06f;
+    constexpr auto SPECTRUM_TEXT_ALPHA         = 0.55f;
+    constexpr auto SPECTRUM_TEXT_HEIGHT        = 11.f;
+    constexpr auto SPECTRUM_TEXT_GAP           = 3.f;
+    constexpr auto SPECTRUM_LEVEL_TEXT_WIDTH   = 30.f;
+    constexpr auto SPECTRUM_READOUT_LINE_ALPHA = 0.18f;
+    constexpr auto SPECTRUM_READOUT_TEXT_ALPHA = 0.7f;
+    constexpr auto SPECTRUM_READOUT_WIDTH      = 96.f;
+    constexpr auto SPECTRUM_READOUT_GAP        = 6.f;
+    constexpr auto SPECTRUM_CORNER_WIDTH       = 90.f;     // What's written in its top right corner
+    constexpr auto SPECTRUM_LEGEND_WIDTH       = 28.f;     // Each of the curves' names
+    constexpr auto PITCH_MARK_ALPHA            = 0.8f;     // The highlight's, for a pitch at full strength
+    constexpr auto PITCH_MARK_THICKNESS        = 1.5f;
+    constexpr auto PITCH_MARK_TEXT_WIDTH       = 34.f;
+
+    // A cell of the voice strip
+    constexpr auto VOICE_CELL_PADDING     = 6.f;
+    constexpr auto VOICE_NOTE_HEIGHT      = 20.f;
+    constexpr auto VOICE_TALL_MIN_HEIGHT  = 48.f;   // Under it only the note shows
+    constexpr auto VOICE_LIGHT_WIDTH      = 10.f;
+    constexpr auto VOICE_LIGHT_HEIGHT     = 3.f;
+
     /** @brief Whether a slider is what the skin draws: a vertical track with its value below. */
     bool isFader(const juce::Slider& slider)
     {
@@ -143,6 +177,213 @@ void HelixxLookAndFeel::drawPanel(juce::Graphics& g, juce::Rectangle<float> boun
 juce::Rectangle<int> HelixxLookAndFeel::getPanelContentBounds(juce::Rectangle<int> bounds)
 {
     return bounds.reduced(PANEL_MARGIN + PANEL_PADDING);
+}
+
+/**
+ * ============================================================================
+ * =                                 DISPLAYS                                 =
+ * ============================================================================
+ */
+void HelixxLookAndFeel::drawSpectrumDisplay(juce::Graphics& g, juce::Rectangle<float> bounds, const SpectrumDisplay& display) const
+{
+    drawDisplayBox(g, bounds);
+
+    // --- The curves' place ---
+    const auto area = getSpectrumDisplayArea(bounds);
+    if (area.isEmpty())
+        return;
+
+    const auto pointAt = [&area](float position, float level)
+    {
+        return juce::Point<float> { area.getX() + position * area.getWidth(),
+                                    area.getBottom() - juce::jlimit(0.f, 1.f, level) * area.getHeight() };
+    };
+
+    // --- Its levels: a line each, full level's the brightest, and its text over its left end ---
+    for (const auto& marker : display.levelMarkers)
+    {
+        const auto y = pointAt(0.f, marker.level).y;
+
+        g.setColour(palette.surface.withAlpha(juce::exactlyEqual(marker.level, display.unity) ? SPECTRUM_UNITY_ALPHA : SPECTRUM_LINE_ALPHA));
+        g.drawLine(area.getX(), y, area.getRight(), y);
+
+        g.setColour(palette.surface.withAlpha(SPECTRUM_TEXT_ALPHA));
+        drawDisplayText(g, marker.text, { area.getX() + SPECTRUM_TEXT_GAP, y - SPECTRUM_TEXT_HEIGHT, SPECTRUM_LEVEL_TEXT_WIDTH, SPECTRUM_TEXT_HEIGHT },
+                        juce::Justification::centredLeft);
+    }
+
+    // --- The frequencies between those marked: a fainter line each ---
+    g.setColour(palette.surface.withAlpha(SPECTRUM_MINOR_LINE_ALPHA));
+    for (const auto position : display.frequencyLines)
+    {
+        const auto top  = pointAt(position, 1.f);
+        const auto base = pointAt(position, 0.f);
+        g.drawLine(top.x, top.y, base.x, base.y);
+    }
+
+    // --- Its frequencies: a line each, and its text at the bottom, from the last one up to it ---
+    auto previousAt = 0.f;
+    for (const auto& marker : display.frequencyMarkers)
+    {
+        const auto top     = pointAt(marker.position, 1.f);
+        const auto base    = pointAt(marker.position, 0.f);
+        const auto textBox = juce::Rectangle<float> { pointAt(previousAt, 0.f).x + SPECTRUM_TEXT_GAP,
+                                                      area.getBottom() - SPECTRUM_TEXT_HEIGHT,
+                                                      juce::jmax((marker.position - previousAt) * area.getWidth() - 2.f * SPECTRUM_TEXT_GAP, 0.f),
+                                                      SPECTRUM_TEXT_HEIGHT };
+
+        g.setColour(palette.surface.withAlpha(SPECTRUM_LINE_ALPHA));
+        g.drawLine(top.x, top.y, base.x, base.y);
+
+        g.setColour(palette.surface.withAlpha(SPECTRUM_TEXT_ALPHA));
+        drawDisplayText(g, marker.text, textBox, juce::Justification::centredRight);
+
+        previousAt = marker.position;
+    }
+
+    // --- Where the modulator acts: a thin line at each mark, a thicker one at the selected pitch ---
+    for (const auto& mark : display.pitchMarks)
+    {
+        const auto top  = pointAt(mark.position, 1.f);
+        const auto base = pointAt(mark.position, 0.f);
+
+        g.setColour(palette.highlight.withAlpha(PITCH_MARK_ALPHA * mark.strength));
+        g.drawLine(top.x, top.y, base.x, base.y, mark.isMain ? PITCH_MARK_THICKNESS : CONTROL_OUTLINE);
+
+        if (mark.text.isNotEmpty())
+        {
+            const auto hasRoom = top.x + SPECTRUM_TEXT_GAP + PITCH_MARK_TEXT_WIDTH <= area.getRight();
+            drawDisplayText(g, mark.text,
+                            { hasRoom ? top.x + SPECTRUM_TEXT_GAP : top.x - SPECTRUM_TEXT_GAP - PITCH_MARK_TEXT_WIDTH,
+                              top.y, PITCH_MARK_TEXT_WIDTH, SPECTRUM_TEXT_HEIGHT },
+                            hasRoom ? juce::Justification::centredLeft : juce::Justification::centredRight);
+        }
+    }
+
+    // --- Where the mouse is: a cross through it, and beside it what's read there, on the side with room ---
+    if (const auto* readout = display.readout)
+    {
+        const auto at = pointAt(readout->position, readout->level);
+
+        g.setColour(palette.surface.withAlpha(SPECTRUM_READOUT_LINE_ALPHA));
+        g.drawLine(at.x, area.getY(), at.x, area.getBottom());
+        g.drawLine(area.getX(), at.y, area.getRight(), at.y);
+
+        const auto boxHeight = 2.f * SPECTRUM_TEXT_HEIGHT;
+        const auto right = at.x + SPECTRUM_READOUT_GAP + SPECTRUM_READOUT_WIDTH <= area.getRight();
+        const auto above = at.y - SPECTRUM_READOUT_GAP - boxHeight >= area.getY();
+        const auto box   = juce::Rectangle<float> { right ? at.x + SPECTRUM_READOUT_GAP : at.x - SPECTRUM_READOUT_GAP - SPECTRUM_READOUT_WIDTH,
+                                                    above ? at.y - SPECTRUM_READOUT_GAP - boxHeight : at.y + SPECTRUM_READOUT_GAP,
+                                                    SPECTRUM_READOUT_WIDTH, boxHeight };
+        const auto justification = right ? juce::Justification::centredLeft : juce::Justification::centredRight;
+
+        g.setColour(palette.surface.withAlpha(SPECTRUM_READOUT_TEXT_ALPHA));
+        drawDisplayText(g, readout->frequencyText + "  " + readout->levelText, box.withHeight(SPECTRUM_TEXT_HEIGHT), justification);
+        drawDisplayText(g, readout->noteText, box.withTrimmedTop(SPECTRUM_TEXT_HEIGHT), justification);
+    }
+
+    // --- The curves ---
+    const auto makeCurve = [&pointAt](const std::vector<float>& levels)
+    {
+        const auto numSegments = static_cast<float>(levels.size() - 1);
+
+        juce::Path curve;
+        curve.startNewSubPath(pointAt(0.f, levels[0]));
+        for (size_t pointIdx = 1; pointIdx < levels.size(); ++pointIdx)
+            curve.lineTo(pointAt(static_cast<float>(pointIdx) / numSegments, levels[pointIdx]));
+        return curve;
+    };
+
+    // What goes in, behind what comes out
+    if (display.inputLevels.size() >= 2)
+    {
+        g.setColour(palette.accent.withAlpha(SPECTRUM_INPUT_ALPHA));
+        g.strokePath(makeCurve(display.inputLevels), juce::PathStrokeType(SPECTRUM_INPUT_THICKNESS));
+    }
+
+    // What comes out, and what's under it down to the bottom
+    if (display.outputLevels.size() >= 2)
+    {
+        const auto curve = makeCurve(display.outputLevels);
+
+        auto under = curve;
+        under.lineTo(area.getBottomRight());
+        under.lineTo(area.getBottomLeft());
+        under.closeSubPath();
+
+        const auto fill = palette.accent.withAlpha(DISPLAY_FILL_ALPHA);
+        g.setGradientFill(juce::ColourGradient(fill, area.getTopLeft(), fill.withAlpha(0.f), area.getBottomLeft(), false));
+        g.fillPath(under);
+
+        g.setColour(palette.foreground);
+        g.strokePath(curve, juce::PathStrokeType(SPECTRUM_CURVE_THICKNESS));
+    }
+
+    // --- Its top right corner: which curve is which, and the index under them ---
+    auto corner = area.withLeft(area.getRight() - SPECTRUM_CORNER_WIDTH).withHeight(2.f * SPECTRUM_TEXT_HEIGHT);
+    auto legend = corner.removeFromTop(SPECTRUM_TEXT_HEIGHT);
+
+    g.setColour(palette.foreground);
+    drawDisplayText(g, "OUT", legend.removeFromRight(SPECTRUM_LEGEND_WIDTH), juce::Justification::centredRight);
+    g.setColour(palette.accent);
+    drawDisplayText(g, "IN", legend.removeFromRight(SPECTRUM_LEGEND_WIDTH), juce::Justification::centredRight);
+
+    g.setColour(palette.foreground);
+    drawDisplayText(g, display.indexText, corner, juce::Justification::centredRight);
+}
+
+juce::Rectangle<float> HelixxLookAndFeel::getSpectrumDisplayArea(juce::Rectangle<float> bounds)
+{
+    return bounds.reduced(SPECTRUM_MARGIN);
+}
+
+void HelixxLookAndFeel::drawVoiceCell(juce::Graphics& g, juce::Rectangle<float> bounds, const VoiceCell& cell, bool isHighlighted) const
+{
+    // --- Its box: lit while selected ---
+    g.setColour(cell.isSelected ? palette.recess.interpolatedWith(palette.accent, CONTROL_LIT_TINT) : palette.recess);
+    g.fillRoundedRectangle(bounds, DISPLAY_CORNER);
+
+    g.setColour(cell.isSelected ? palette.accent.withMultipliedAlpha(isHighlighted ? 1.f : CONTROL_LIT_ALPHA)
+                : isHighlighted ? palette.foreground.withAlpha(CONTROL_HOVER_ALPHA)
+                                : palette.surface.withAlpha(DISPLAY_OUTLINE_ALPHA));
+    g.drawRoundedRectangle(bounds.reduced(CONTROL_OUTLINE * 0.5f), DISPLAY_CORNER, CONTROL_OUTLINE);
+
+    auto area = bounds.reduced(VOICE_CELL_PADDING, 0.f);
+    const auto isTall = bounds.getHeight() >= VOICE_TALL_MIN_HEIGHT;
+
+    // --- Its name, and the light at the other side ---
+    const auto nameLine = isTall ? area.removeFromTop(SPECTRUM_TEXT_HEIGHT + VOICE_CELL_PADDING).withTrimmedTop(VOICE_CELL_PADDING * 0.5f)
+                                 : area;
+
+    g.setColour(palette.surface);
+    drawDisplayText(g, cell.name, nameLine, juce::Justification::centredLeft);
+
+    if (cell.hasLight)
+    {
+        const auto light = nameLine.withLeft(nameLine.getRight() - VOICE_LIGHT_WIDTH)
+                                   .withSizeKeepingCentre(VOICE_LIGHT_WIDTH, VOICE_LIGHT_HEIGHT);
+
+        drawSwitchBar(g, light, cell.isTracked ? std::optional { palette.accent } : std::nullopt, false, false, 1.f);
+    }
+
+    // --- The note, and what's known of it under it ---
+    const auto noteColour = cell.isSounding ? palette.foreground : palette.surface;
+
+    if (! isTall)
+    {
+        g.setColour(noteColour);
+        drawDisplayText(g, cell.note, area, juce::Justification::centred);
+        return;
+    }
+
+    const auto detailLine = area.removeFromBottom(SPECTRUM_TEXT_HEIGHT + VOICE_CELL_PADDING * 0.5f).withTrimmedBottom(VOICE_CELL_PADDING * 0.5f);
+
+    g.setColour(noteColour);
+    g.setFont(textFont.withHeight(VOICE_NOTE_HEIGHT));
+    g.drawFittedText(cell.note, area.toNearestInt(), juce::Justification::centred, 1, MIN_TEXT_SQUASH);
+
+    g.setColour(palette.surface);
+    drawDisplayText(g, cell.detail, detailLine, juce::Justification::centred);
 }
 
 /**
@@ -377,6 +618,22 @@ void HelixxLookAndFeel::drawControlBox(juce::Graphics& g, juce::Rectangle<float>
                                : palette.foreground.withAlpha(isHighlighted ? CONTROL_HOVER_ALPHA : CONTROL_OUTLINE_ALPHA);
     g.setColour(outline);
     g.drawRoundedRectangle(bounds.reduced(CONTROL_OUTLINE * 0.5f), CONTROL_CORNER, CONTROL_OUTLINE);
+}
+
+void HelixxLookAndFeel::drawDisplayBox(juce::Graphics& g, juce::Rectangle<float> bounds) const
+{
+    g.setColour(palette.recess);
+    g.fillRoundedRectangle(bounds, DISPLAY_CORNER);
+
+    g.setColour(palette.surface.withAlpha(DISPLAY_OUTLINE_ALPHA));
+    g.drawRoundedRectangle(bounds.reduced(CONTROL_OUTLINE * 0.5f), DISPLAY_CORNER, CONTROL_OUTLINE);
+}
+
+void HelixxLookAndFeel::drawDisplayText(juce::Graphics& g, const juce::String& text, juce::Rectangle<float> bounds,
+                                        juce::Justification justification) const
+{
+    g.setFont(textFont.withHeight(SPECTRUM_TEXT_HEIGHT));
+    g.drawFittedText(text, bounds.toNearestInt(), justification, 1, MIN_TEXT_SQUASH);
 }
 
 void HelixxLookAndFeel::drawSwitchBar(juce::Graphics& g, juce::Rectangle<float> bar, std::optional<juce::Colour> colour,

@@ -3,6 +3,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
+#include <optional>
+
+#include "VoiceMonitor.h"
 #include "dsp/DelayFM.h"
 
 namespace helixx
@@ -67,6 +70,25 @@ public:
      */
     int getLatencySamples() const;
 
+    /** @brief Returns what the displays read from the audio thread. */
+    VoiceMonitor& getVoiceMonitor();
+
+    /** @brief Returns the current modulator frequency, as a multiple of the pitch. */
+    float getCoarseFreq() const;
+
+    /** @brief Returns the current modulation depth, 0..1. */
+    float getDepth() const;
+
+    /**
+     * @brief Returns the FM modulation index of a voice: the peak phase
+     *        deviation of its fundamental, in radians.
+     * @param pitchHz Detected pitch of the voice, or 0 if there's none. In
+     *                relative mode the index doesn't depend on it.
+     * @return The index, or nothing if the algorithm isn't Adaptive FM or the
+     *         index depends on a pitch that's unknown.
+     */
+    std::optional<float> getModulationIndex(float pitchHz) const;
+
 private:
     juce::AudioProcessorValueTreeState parameters;
 
@@ -79,6 +101,7 @@ private:
     std::atomic<float>* isRelativeParam = nullptr;
 
     DelayFM delayFM;
+    VoiceMonitor voiceMonitor;
 
     static constexpr unsigned int oversamplingOrder = 2; // 2^2 = 4x oversampling
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampling;

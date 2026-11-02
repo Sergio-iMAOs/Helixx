@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <optional>
+#include <vector>
 
 namespace helixx
 {
@@ -13,8 +14,9 @@ namespace helixx
  *        and on/off as a bar that lights up.
  *
  * Covers what the plugin shows: vertical faders with their value below,
- * labels, combo boxes and their menus, and toggle buttons. Set on the editor,
- * so every component inside it gets it. Disabled controls are dimmed.
+ * labels, combo boxes and their menus, toggle buttons, and the displays, sunk
+ * into the panel like SynthWorld's. Set on the editor, so every component
+ * inside it gets it. Disabled controls are dimmed.
  */
 class HelixxLookAndFeel: public juce::LookAndFeel_V4
 {
@@ -26,6 +28,74 @@ public:
 
     /** @brief What's left inside a panel for what's on it. */
     static juce::Rectangle<int> getPanelContentBounds(juce::Rectangle<int> bounds);
+
+    /** @brief A frequency marked behind a spectrum, with its text at the bottom. */
+    struct FrequencyMarker
+    {
+        float position = 0.f;   ///< Along the frequencies shown, 0..1
+        juce::String text;
+    };
+
+    /** @brief A level marked behind a spectrum, with its text at the left. */
+    struct LevelMarker
+    {
+        float level = 0.f;      ///< Up the levels shown, 0..1
+        juce::String text;
+    };
+
+    /** @brief A frequency the modulator acts on: a pitch or one of its sidebands. */
+    struct PitchMark
+    {
+        float position = 0.f;       ///< Along the frequencies shown, 0..1
+        float strength = 1.f;       ///< How strongly it's drawn, 0..1
+        juce::String text;          ///< At its top; may be empty
+        bool isMain = false;        ///< The selected channel's pitch: a thicker line
+    };
+
+    /** @brief What's read off a spectrum where the mouse is. */
+    struct SpectrumReadout
+    {
+        float position = 0.f;       ///< Along the frequencies shown, 0..1
+        float level = 0.f;          ///< Up the levels shown, 0..1
+        juce::String frequencyText;
+        juce::String levelText;
+        juce::String noteText;
+    };
+
+    /** @brief What a spectrum display shows (drawSpectrumDisplay()). */
+    struct SpectrumDisplay
+    {
+        const std::vector<float>& outputLevels;     ///< The curve: places up the levels shown, the lowest frequency first
+        const std::vector<float>& inputLevels;      ///< The faint curve behind it
+        const std::vector<FrequencyMarker>& frequencyMarkers;
+        const std::vector<float>& frequencyLines;   ///< Fainter lines, along the frequencies shown
+        const std::vector<LevelMarker>& levelMarkers;
+        float unity = 0.f;                          ///< The level marker drawn brightest
+        const std::vector<PitchMark>& pitchMarks;
+        const SpectrumReadout* readout = nullptr;   ///< None while the mouse isn't there
+        juce::String indexText;                     ///< In its corner; may be empty
+    };
+
+    /** @brief What a cell of the voice strip shows (drawVoiceCell()). */
+    struct VoiceCell
+    {
+        juce::String name;          ///< In its corner; may be empty
+        juce::String note;
+        juce::String detail;        ///< Under the note, when there's room
+        bool isTracked  = false;    ///< Lights up its light
+        bool isSounding = false;    ///< Dimmed otherwise
+        bool isSelected = false;
+        bool hasLight   = false;
+    };
+
+    /** @brief A spectrum: its levels and frequencies, the marks, then its curves over them. */
+    void drawSpectrumDisplay(juce::Graphics& g, juce::Rectangle<float> bounds, const SpectrumDisplay& display) const;
+
+    /** @brief Where a spectrum's curve goes inside its box. */
+    static juce::Rectangle<float> getSpectrumDisplayArea(juce::Rectangle<float> bounds);
+
+    /** @brief A cell of the voice strip. Under a certain height only its note shows. */
+    void drawVoiceCell(juce::Graphics& g, juce::Rectangle<float> bounds, const VoiceCell& cell, bool isHighlighted) const;
 
     // Text
     juce::Font getLabelFont     (juce::Label& label) override;
@@ -71,6 +141,7 @@ private:
         juce::Colour surface    { 0xff77747f }; // #77747f     ///< Guides; inactive or secondary elements
         juce::Colour foreground { 0xff232125 }; // #232125     ///< Text, outlines
         juce::Colour accent     { 0xff7648c4 }; // #7648c4     ///< What's on or selected
+        juce::Colour highlight  { 0xffc77700 }; // #c77700     ///< What's drawn over a display against another axis
     };
 
     const Palette palette;
@@ -94,6 +165,13 @@ private:
      */
     void drawSwitchBar(juce::Graphics& g, juce::Rectangle<float> bar, std::optional<juce::Colour> colour,
                        bool isHighlighted, bool isDown, float alpha) const;
+
+    /** @brief The box of a display: sunk into the panel, with a faint outline. */
+    void drawDisplayBox(juce::Graphics& g, juce::Rectangle<float> bounds) const;
+
+    /** @brief A line of text in a display, narrowed to fit. */
+    void drawDisplayText(juce::Graphics& g, const juce::String& text, juce::Rectangle<float> bounds,
+                         juce::Justification justification) const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HelixxLookAndFeel)
 };

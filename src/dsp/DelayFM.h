@@ -133,6 +133,13 @@ public:
      */
     void setRelativeToPitch (bool isRelative);
 
+    /**
+     * @brief Returns a channel's latest pitch estimate. Call from the audio thread.
+     * @param channel Channel index, below the count given to prepare().
+     * @return Frequency in Hz, or 0 if the latest analysis found no pitch.
+     */
+    float getDetectedPitch(unsigned int channel) const;
+
 private:
     // Smoothed parameters: the value reached at the end of the last block and
     // the one to reach at the end of the next.
