@@ -19,9 +19,15 @@ juce_add_plugin(${PROJECT_NAME}
 )
 
 
+juce_add_binary_data(${PROJECT_NAME}Assets
+    SOURCES
+        ../assets/Oscilla-Regular.ttf)
+
+
 target_sources(${PROJECT_NAME}
     PRIVATE
         ui/HelixxComponent.cpp
+        ui/HelixxLookAndFeel.cpp
         dsp/PitchDetector.cpp
         dsp/Oscillator.cpp
         dsp/FractionalDelay.cpp
@@ -41,7 +47,7 @@ target_compile_definitions(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        # AudioPluginData           # If we'd created a binary data target, we'd link to it here
+        ${PROJECT_NAME}Assets
         juce::juce_audio_utils
         juce::juce_audio_processors
         juce::juce_dsp

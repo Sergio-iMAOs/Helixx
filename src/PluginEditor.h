@@ -2,10 +2,12 @@
 
 #include "PluginProcessor.h"
 #include "ui/HelixxComponent.h"
+#include "ui/HelixxLookAndFeel.h"
 
 //==============================================================================
 /**
- * @brief Plugin window: a fixed-size frame around helixx::HelixxComponent.
+ * @brief Plugin window: a fixed-size panel around helixx::HelixxComponent,
+ *        which sets the look of everything in it.
  */
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor
 {
@@ -22,6 +24,7 @@ private:
     // access the processor object that created it.
     AudioPluginAudioProcessor& processorRef;
 
+    helixx::HelixxLookAndFeel lookAndFeel; // before what uses it: it must outlive it
     helixx::HelixxComponent helixxUI;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessorEditor)

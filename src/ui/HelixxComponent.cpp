@@ -33,7 +33,7 @@ HelixxComponent::HelixxComponent(Helixx& helixxDSP)
     coarseFreqLabel .setJustificationType(juce::Justification::centred);
     depthLabel      .setJustificationType(juce::Justification::centred);
     rangeLabel      .setJustificationType(juce::Justification::centred);
-    relativeLabel   .setJustificationType(juce::Justification::centred);
+    relativeLabel   .setJustificationType(juce::Justification::centredLeft);
 
     addAndMakeVisible(algorithmBox);
 
@@ -77,11 +77,11 @@ void HelixxComponent::resized()
     depthLabel      .setBounds(depthBounds  .removeFromTop(labelHeight));
     depthSlider     .setBounds(depthBounds);
 
-    const auto relativeHeight = rangeBounds.getHeight() / 4;
+    constexpr auto relativeButtonWidth = 24;
 
-    auto relativeBounds = rangeBounds.removeFromBottom(relativeHeight);
-    relativeLabel   .setBounds(relativeBounds   .removeFromTop(labelHeight));
-    relativeButton  .setBounds(relativeBounds);
+    auto relativeBounds = rangeBounds.removeFromBottom(labelHeight);
+    relativeButton  .setBounds(relativeBounds   .removeFromLeft(relativeButtonWidth));
+    relativeLabel   .setBounds(relativeBounds);
     rangeLabel      .setBounds(rangeBounds      .removeFromTop(labelHeight));
     rangeSlider     .setBounds(rangeBounds);
 }
