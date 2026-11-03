@@ -2,7 +2,7 @@
 
 **Adaptive FM for hexaphonic guitars and other multichannel sources.** Helixx is an audio effect that follows the pitch of each channel on its own and frequency-modulates that channel with its own modulator, so a whole chord can go through FM without turning to mud.
 
-More on the [Helixx page](https://synthworldaudio.com/synths/helixx/) at SynthWorld.
+Helixx is made by [SynthWorld](https://synthworldaudio.com/).
 
 ![The Helixx plugin window: controls on the left, a spectrum with sideband markers on the right, and a strip of six voices below it](docs/helixx-ui.png)
 

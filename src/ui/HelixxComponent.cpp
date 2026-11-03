@@ -8,7 +8,7 @@ namespace helixx
 
 namespace
 {
-    constexpr auto HELIXX_URL     = "https://synthworldaudio.com/synths/helixx/";
+    constexpr auto HELIXX_URL     = "https://github.com/Sergio-iMAOs/Helixx";
     constexpr auto SYNTHWORLD_URL = "https://synthworldaudio.com/";
 }
 
